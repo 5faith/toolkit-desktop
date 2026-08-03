@@ -111,4 +111,4 @@ jobs:
           releaseBody: ''
           releaseDraft: true
           prerelease: false
-          args: '--bundles nsis --config bundle.windows.nsis.portable=true'
+          args: '--bundles nsis --config {"bundle":{"windows":{"nsis":{"portable":true}}}}'
