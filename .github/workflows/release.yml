@@ -15,7 +15,7 @@ jobs:
       matrix:
         include:
           - platform: windows-latest
-            args: ''
+            args: '--bundles nsis,msi'
           - platform: macos-latest
             args: '--target aarch64-apple-darwin'
           - platform: macos-latest
@@ -64,6 +64,7 @@ jobs:
 
             ### Windows
             - **Setup (.exe)**: NSIS installer (recommended)
+            - **Portable (.exe)**: 便携版，无需安装，解压即用
             - **MSI (.msi)**: Windows Installer package
 
             ### macOS
@@ -76,3 +77,38 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+  build-windows-portable:
+    runs-on: windows-latest
+    needs: []
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build portable executable
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: Toolkit Desktop ${{ github.ref_name }}
+          releaseBody: ''
+          releaseDraft: true
+          prerelease: false
+          args: '--bundles nsis --config bundle.windows.nsis.portable=true'
