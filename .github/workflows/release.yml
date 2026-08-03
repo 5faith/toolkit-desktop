@@ -15,7 +15,7 @@ jobs:
       matrix:
         include:
           - platform: windows-latest
-            args: '--bundles nsis,msi --config {"bundle":{"windows":{"nsis":{"installMode":"both"}}}}'
+            args: ''
           - platform: macos-latest
             args: '--target aarch64-apple-darwin'
           - platform: macos-latest
@@ -63,9 +63,9 @@ jobs:
             ## Downloads
 
             ### Windows
-            - **Setup (.exe)**: NSIS installer (recommended)
-            - **Portable (.exe)**: 便携版，无需安装，解压即用
-            - **MSI (.msi)**: Windows Installer package
+            - **Portable (.zip)**: 便携版，解压即用，无需安装
+            - **Setup (.exe)**: NSIS 安装包（推荐）
+            - **MSI (.msi)**: Windows Installer 安装包
 
             ### macOS
             - **Apple Silicon (.dmg)**: For M1/M2/M3/M4 Macs
@@ -78,35 +78,39 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
 
-  build-windows-portable:
-    runs-on: windows-latest
-    needs: [build]
+      - name: Create Windows portable zip
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}"
+          $zipName = "Toolkit-Desktop-${version}-windows-x64-portable.zip"
+          $stagingDir = "portable-staging"
+          New-Item -ItemType Directory -Path $stagingDir
 
-    steps:
-      - uses: actions/checkout@v7
+          $exePath = Get-ChildItem -Path "src-tauri/target/release" -Filter "*.exe" | Where-Object { $_.Name -notlike "*bundle*" } | Select-Object -First 1
+          Copy-Item $exePath.FullName "$stagingDir/"
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
+          Compress-Archive -Path "$stagingDir/*" -DestinationPath $zipName
+          gh release upload "${{ github.ref_name }}" $zipName --clobber
 
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+      - name: Create macOS x64 portable zip
+        if: matrix.platform == 'macos-latest' && contains(matrix.args, 'x86_64')
+        run: |
+          APP_PATH=$(find src-tauri/target/x86_64-apple-darwin/release/bundle -name "*.app" -type d | head -1)
+          VERSION="${{ github.ref_name }}"
+          ZIP_NAME="Toolkit-Desktop-${VERSION}-macos-x64.zip"
+          cd "$(dirname "$APP_PATH")"
+          zip -r "../../$ZIP_NAME" "$(basename "$APP_PATH")"
+          cd ../..
+          gh release upload "${{ github.ref_name }}" "$ZIP_NAME" --clobber
 
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: './src-tauri -> target'
-
-      - name: Install frontend dependencies
-        run: npm ci
-
-      - name: Build portable executable
-        uses: tauri-apps/tauri-action@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseDraft: true
-          prerelease: false
-          args: '--bundles nsis --config {"bundle":{"windows":{"nsis":{"portable":true}}}}'
+      - name: Create macOS arm64 portable zip
+        if: matrix.platform == 'macos-latest' && contains(matrix.args, 'aarch64')
+        run: |
+          APP_PATH=$(find src-tauri/target/aarch64-apple-darwin/release/bundle -name "*.app" -type d | head -1)
+          VERSION="${{ github.ref_name }}"
+          ZIP_NAME="Toolkit-Desktop-${VERSION}-macos-arm64.zip"
+          cd "$(dirname "$APP_PATH")"
+          zip -r "../../$ZIP_NAME" "$(basename "$APP_PATH")"
+          cd ../..
+          gh release upload "${{ github.ref_name }}" "$ZIP_NAME" --clobber
