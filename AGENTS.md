@@ -2,15 +2,16 @@
 
 ## 项目概述
 
-基于 **Tauri 2.0** 的桌面日常工具集，第一版包含 5 个工具模块：
+基于 **Tauri 2.0** 的桌面日常工具集，当前包含 6 个工具模块：
 
 | 模块 | 说明 |
 |------|------|
-| JSON / XML Formatter | JSON 和 XML 的格式化、压缩、校验、树形展示 |
-| Timestamp Tool | 时间戳与日期互转、多时区支持 |
+| JSON / XML Formatter | JSON 和 XML 的格式化、压缩、校验 |
+| Timestamp Tool | 时间戳与日期互转 |
 | WebSocket Debugger | WebSocket 连接、消息收发、协议调试 |
-| Text Diff | 两段文本的差异对比，支持多种对比模式 |
+| Text Diff | 两段文本的差异对比 |
 | FLV Player | FLV 流媒体本地播放器 |
+| Encryption | UUID 生成、MD5 哈希、AES-256 加解密 |
 
 ---
 
@@ -52,136 +53,151 @@ toolkit-desktop/
 │   ├── src/
 │   │   ├── main.rs
 │   │   ├── lib.rs
-│   │   ├── commands/             # Tauri commands (全局)
+│   │   ├── commands/             # Tauri commands
 │   │   │   ├── mod.rs
-│   │   │   └── ...
-│   │   └── modules/              # Rust 侧工具模块
+│   │   │   ├── formatter.rs      # format_json, format_xml, validate_json, validate_xml
+│   │   │   ├── timestamp.rs      # get_system_timestamp, convert_timestamp
+│   │   │   ├── diff.rs           # compute_diff
+│   │   │   └── flv.rs            # read_local_file
+│   │   └── modules/              # Rust 侧工具模块 (占位)
 │   │       ├── mod.rs
-│   │       ├── formatter/        # JSON/XML 格式化 Rust 逻辑
-│   │       ├── timestamp/
-│   │       ├── websocket/
-│   │       ├── diff/
-│   │       └── flv/
+│   │       ├── formatter/mod.rs
+│   │       ├── timestamp/mod.rs
+│   │       ├── diff/mod.rs
+│   │       └── flv/mod.rs
 │   ├── Cargo.toml
 │   └── tauri.conf.json
 │
 ├── src/                          # Vue 3 前端
 │   ├── main.ts                   # 应用入口
-│   ├── App.vue                   # 根组件 (壳)
+│   ├── App.vue                   # 根组件 (侧边栏 + 路由 + 状态栏)
+│   ├── env.d.ts                  # TypeScript 声明 (Vue SFC, flv.js)
+│   │
 │   ├── router/
 │   │   └── index.ts              # 路由配置 (动态注册模块路由)
+│   │
 │   ├── stores/                   # Pinia 全局 store
-│   │   ├── app.ts                # 全局应用状态 (当前工具、主题等)
-│   │   └── index.ts
+│   │   ├── index.ts              # createPinia()
+│   │   └── app.ts                # activeModuleId, theme, sidebarCollapsed
 │   │
 │   ├── core/                     # 核心抽象层
-│   │   ├── module-registry.ts    # 模块注册器 (设计模式: Registry)
-│   │   ├── module.ts             # 模块接口定义
-│   │   ├── event-bus.ts          # 事件总线 (设计模式: Observer / Pub-Sub)
-│   │   ├── command-manager.ts    # 命令管理器 (设计模式: Command)
-│   │   └── plugin-system.ts      # 插件系统 (设计模式: Plugin)
+│   │   ├── module.ts             # ToolModule 接口定义
+│   │   ├── module-registry.ts    # 模块注册器 (Registry 模式, 单例)
+│   │   ├── event-bus.ts          # 事件总线 (Pub-Sub 模式, 单例)
+│   │   ├── command-manager.ts    # 命令管理器 (Command 模式, 单例)
+│   │   └── plugin-system.ts      # 插件系统 (Plugin 模式, 预留)
 │   │
-│   ├── shared/                   # 共用组件和工具 (跨模块共享)
-│   │   ├── components/           # 通用 UI 组件
-│   │   │   ├── ToolShell.vue     # 工具壳组件 (统一布局)
-│   │   │   ├── TabBar.vue        # 工具标签栏
-│   │   │   ├── CodeEditor.vue    # 代码编辑器组件
+│   ├── shared/                   # 共用层 (跨模块共享)
+│   │   ├── components/
+│   │   │   ├── ToolShell.vue     # 布局壳 (sidebar + content + statusbar)
+│   │   │   ├── CodeEditor.vue    # 代码编辑器 (textarea + v-model)
 │   │   │   ├── Toolbar.vue       # 通用工具栏
-│   │   │   ├── StatusBar.vue     # 状态栏
-│   │   │   ├── JsonTreeView.vue  # JSON 树形视图
-│   │   │   ├── MonacoWrapper.vue # Monaco Editor 封装
-│   │   │   └── ...
-│   │   ├── composables/          # Vue 组合式函数
-│   │   │   ├── useClipboard.ts
-│   │   │   ├── useTheme.ts
-│   │   │   ├── useNotification.ts
-│   │   │   ├── useShortcuts.ts
-│   │   │   └── useModule.ts      # 模块接入 Hook
-│   │   ├── utils/                # 纯工具函数
-│   │   │   ├── format.ts
-│   │   │   ├── validator.ts
-│   │   │   ├── clipboard.ts
-│   │   │   └── storage.ts
-│   │   ├── types/                # 共享类型定义
-│   │   │   ├── module.ts
-│   │   │   ├── common.ts
-│   │   │   └── index.ts
-│   │   └── styles/               # 全局样式
-│   │       ├── variables.css     # CSS Variables (主题)
-│   │       ├── reset.css
-│   │       └── global.css
+│   │   │   ├── TabBar.vue        # 标签栏
+│   │   │   └── StatusBar.vue     # 状态栏
+│   │   ├── composables/
+│   │   │   ├── useClipboard.ts   # 剪贴板复制 + 自动重置
+│   │   │   ├── useModule.ts      # 模块访问 Hook
+│   │   │   ├── useNotification.ts # Toast 通知系统
+│   │   │   ├── useShortcuts.ts   # 全局快捷键注册
+│   │   │   └── useTheme.ts       # 主题切换 (light/dark/system)
+│   │   ├── utils/
+│   │   │   ├── clipboard.ts      # copyToClipboard()
+│   │   │   ├── format.ts         # formatDate(), formatNumber(), formatBytes()
+│   │   │   ├── storage.ts        # localStorage 封装
+│   │   │   └── validator.ts      # isValidJson(), isValidUrl(), isNonEmpty()
+│   │   ├── types/
+│   │   │   ├── index.ts          # Barrel export
+│   │   │   ├── common.ts         # ThemeMode, NotificationOptions, ClipboardResult
+│   │   │   ├── events.ts         # AppEvents 接口
+│   │   │   └── module.ts         # Re-exports ToolModule, ModuleMeta
+│   │   └── styles/
+│   │       ├── variables.css     # CSS Variables (light/dark 主题)
+│   │       ├── reset.css         # CSS Reset
+│   │       └── global.css        # 全局样式
 │   │
-│   ├── lib/                      # 本地引入的第三方库 (非 npm)
+│   ├── lib/                      # 本地第三方库
 │   │   └── flv.js/
-│   │       └── flv.min.js
+│   │       ├── flv.min.js        # flv.js 打包产物
+│   │       └── index.d.ts        # TypeScript 类型声明
 │   │
-│   └── modules/                  # 工具模块目录 (每个模块自包含)
-│       ├── index.ts              # 模块自动发现 & 注册
+│   └── modules/                  # 工具模块 (每个模块自包含)
+│       ├── index.ts              # 模块聚合 & registerAllModules()
 │       │
 │       ├── formatter/
-│       │   ├── index.ts          # 模块定义 & 注册
-│       │   ├── meta.ts           # 模块元数据 (名称、图标、快捷键)
+│       │   ├── index.ts          # 模块定义 & 路由注册
+│       │   ├── meta.ts           # { id: 'formatter', name: 'Formatter', icon: '{}', shortcut: 'Ctrl+1' }
+│       │   ├── store.ts          # Pinia store
 │       │   ├── components/
-│       │   │   ├── FormatterView.vue
-│       │   │   ├── JsonPanel.vue
-│       │   │   ├── XmlPanel.vue
-│       │   │   └── ...
-│       │   ├── composables/
-│       │   │   ├── useFormatter.ts
-│       │   │   └── useValidation.ts
-│       │   └── store.ts          # 模块内部 Pinia store
+│       │   │   └── FormatterView.vue
+│       │   └── composables/
+│       │       ├── useFormatter.ts
+│       │       └── useValidation.ts
 │       │
 │       ├── timestamp/
 │       │   ├── index.ts
-│       │   ├── meta.ts
+│       │   ├── meta.ts           # { id: 'timestamp', icon: '⏱', shortcut: 'Ctrl+2' }
+│       │   ├── store.ts
 │       │   ├── components/
-│       │   │   ├── TimestampView.vue
-│       │   │   ├── Converter.vue
-│       │   │   └── TimezoneTable.vue
-│       │   ├── composables/
-│       │   │   └── useTimestamp.ts
-│       │   └── store.ts
+│       │   │   └── TimestampView.vue
+│       │   └── composables/
+│       │       └── useTimestamp.ts
 │       │
 │       ├── websocket/
 │       │   ├── index.ts
-│       │   ├── meta.ts
+│       │   ├── meta.ts           # { id: 'websocket', icon: '🔌', shortcut: 'Ctrl+3' }
+│       │   ├── store.ts
 │       │   ├── components/
-│       │   │   ├── WebsocketView.vue
-│       │   │   ├── ConnectionPanel.vue
-│       │   │   ├── MessageList.vue
-│       │   │   └── SendPanel.vue
-│       │   ├── composables/
-│       │   │   ├── useWebSocket.ts
-│       │   │   └── useMessageLog.ts
-│       │   └── store.ts
+│       │   │   └── WebsocketView.vue
+│       │   └── composables/
+│       │       ├── useWebSocket.ts
+│       │       └── useMessageLog.ts
 │       │
 │       ├── diff/
 │       │   ├── index.ts
-│       │   ├── meta.ts
+│       │   ├── meta.ts           # { id: 'diff', name: 'Text Diff', icon: '⇄', shortcut: 'Ctrl+4' }
+│       │   ├── store.ts
 │       │   ├── components/
-│       │   │   ├── DiffView.vue
-│       │   │   ├── SideBySide.vue
-│       │   │   └── UnifiedView.vue
-│       │   ├── composables/
-│       │   │   └── useDiff.ts
-│       │   └── store.ts
+│       │   │   └── DiffView.vue
+│       │   └── composables/
+│       │       └── useDiff.ts
 │       │
-│       └── flv/
+│       ├── flv/
+│       │   ├── index.ts
+│       │   ├── meta.ts           # { id: 'flv', name: 'FLV Player', icon: '▶', shortcut: 'Ctrl+5' }
+│       │   ├── store.ts
+│       │   ├── components/
+│       │   │   └── FlvPlayerView.vue
+│       │   └── composables/
+│       │       └── useFlvPlayer.ts
+│       │
+│       └── encrypt/
 │           ├── index.ts
-│           ├── meta.ts
+│           ├── meta.ts           # { id: 'encrypt', name: 'Encryption', icon: '🔐', shortcut: 'Ctrl+6' }
+│           ├── store.ts
 │           ├── components/
-│           │   ├── FlvPlayerView.vue
-│           │   ├── VideoPlayer.vue
-│           │   └── StreamInfo.vue
-│           ├── composables/
-│           │   └── useFlvPlayer.ts
-│           └── store.ts
+│           │   └── EncryptView.vue
+│           └── composables/
+│               └── useEncrypt.ts  # UUID, MD5, AES-256-CBC (Web Crypto API)
 │
 ├── public/
-│   └── icons/                    # 工具图标 (SVG)
+│   └── icons/                    # SVG 图标
+│       ├── toolkit.svg           # 软件主图标
+│       ├── formatter.svg
+│       ├── timestamp.svg
+│       ├── websocket.svg
+│       ├── diff.svg
+│       ├── flv.svg
+│       ├── settings.svg
+│       └── theme.svg
+│
+├── .github/
+│   └── workflows/
+│       └── release.yml           # CI/CD: 多平台构建 & GitHub Release
+│
 ├── package.json
 ├── vite.config.ts
 ├── tsconfig.json
+├── uno.config.ts
 └── AGENTS.md
 ```
 
@@ -191,7 +207,7 @@ toolkit-desktop/
 
 ### Registry 模式 — 模块注册
 
-```
+```ts
 // src/core/module.ts — 模块接口
 export interface ToolModule {
   id: string
@@ -205,35 +221,35 @@ export interface ToolModule {
 }
 ```
 
-```
+```ts
 // src/core/module-registry.ts
-单例注册中心，所有模块在启动时调用 register() 注册自身
-模块切换时调用 onDeactivate / onActivate 生命周期钩子
+// 单例注册中心，所有模块在启动时调用 register() 注册自身
+// 模块切换时调用 onDeactivate / onActivate 生命周期钩子
 ```
 
 ### Observer / Pub-Sub — 事件总线
 
-```
+```ts
 // src/core/event-bus.ts
-跨模块通信的唯一通道
-事件类型定义在 shared/types/events.ts
-禁止模块间直接 import 其他模块的内部代码
+// 跨模块通信的唯一通道
+// 事件类型定义在 shared/types/events.ts
+// 禁止模块间直接 import 其他模块的内部代码
 ```
 
 ### Command 模式 — 操作管理
 
-```
+```ts
 // src/core/command-manager.ts
-用于 Undo/Redo、批量操作等场景
-每个操作封装为 Command 对象 (execute / undo)
+// 用于 Undo/Redo、批量操作等场景
+// 每个操作封装为 Command 对象 (execute / undo)
 ```
 
 ### Plugin 模式 — 扩展点
 
-```
+```ts
 // src/core/plugin-system.ts
-为未来工具扩展预留的插件机制
-插件通过 definePlugin() 声明，注册到模块注册器
+// 为未来工具扩展预留的插件机制
+// 插件通过 definePlugin() 声明，注册到模块注册器
 ```
 
 ---
@@ -244,20 +260,23 @@ export interface ToolModule {
 
 | 文件 | 职责 |
 |------|------|
-| `index.ts` | 导出 `defineModule()` 调用结果，注册路由和 store |
+| `index.ts` | 导出 `ToolModule` 对象，注册路由 |
 | `meta.ts` | 导出模块元数据 `{ id, name, icon, shortcut }` |
 | `components/` | 模块私有组件 |
 | `composables/` | 模块私有组合式函数 |
 | `store.ts` | 模块内部 Pinia store (可选) |
 
-模块自动注册流程：
+模块注册流程：
 
 ```ts
 // src/modules/index.ts
-const moduleFiles = import.meta.glob('./*/index.ts', { eager: true })
-Object.values(moduleFiles).forEach(mod => {
-  if (mod.default) moduleRegistry.register(mod.default)
-})
+import formatterModule from './formatter'
+import timestampModule from './websocket'
+// ...
+const modules: ToolModule[] = [formatterModule, timestampModule, ...]
+export function registerAllModules() {
+  modules.forEach(mod => moduleRegistry.register(mod))
+}
 ```
 
 ---
@@ -268,7 +287,7 @@ Object.values(moduleFiles).forEach(mod => {
 
 | 类别 | 内容 |
 |------|------|
-| 组件 | ToolShell, TabBar, CodeEditor, Toolbar, StatusBar, JsonTreeView, MonacoWrapper |
+| 组件 | ToolShell, CodeEditor, Toolbar, TabBar, StatusBar |
 | Composables | useClipboard, useTheme, useNotification, useShortcuts, useModule |
 | Utils | format, validator, clipboard, storage |
 | Types | module, common, events |
@@ -283,15 +302,14 @@ Object.values(moduleFiles).forEach(mod => {
 
 ## Tauri Commands 约定
 
-Rust 侧 Tauri Commands 按职责分组到 `src-tauri/src/modules/` 下：
+Rust 侧 Tauri Commands 在 `src-tauri/src/commands/` 下：
 
-| 模块 | Commands |
-|------|----------|
-| formatter | `format_json`, `format_xml`, `validate_json`, `validate_xml` |
-| timestamp | `get_system_timestamp`, `convert_timestamp` |
-| websocket | WebSocket 在前端直接处理，无需 Tauri command |
-| diff | `compute_diff` (大文本差异计算卸载到 Rust) |
-| flv | 文件路径读取等系统级操作 |
+| 模块 | Commands | 实现文件 |
+|------|----------|----------|
+| formatter | `format_json`, `format_xml`, `validate_json`, `validate_xml` | `commands/formatter.rs` |
+| timestamp | `get_system_timestamp`, `convert_timestamp` | `commands/timestamp.rs` |
+| diff | `compute_diff` | `commands/diff.rs` |
+| flv | `read_local_file` | `commands/flv.rs` |
 
 所有 Commands 在 `src-tauri/src/lib.rs` 中统一注册。
 
@@ -305,15 +323,15 @@ Rust 侧 Tauri Commands 按职责分组到 `src-tauri/src/modules/` 下：
 /* src/shared/styles/variables.css */
 :root {
   --color-bg-primary: #ffffff;
-  --color-text-primary: #1a1a1a;
+  --color-text-primary: #111827;
   --color-accent: #3b82f6;
   --color-border: #e5e7eb;
   /* ... */
 }
 
 [data-theme="dark"] {
-  --color-bg-primary: #1a1a1a;
-  --color-text-primary: #e5e7eb;
+  --color-bg-primary: #111827;
+  --color-text-primary: #f9fafb;
   --color-accent: #60a5fa;
   --color-border: #374151;
 }
@@ -326,11 +344,11 @@ Rust 侧 Tauri Commands 按职责分组到 `src-tauri/src/modules/` 下：
 ## 开发规范
 
 ### 命名规范
-- 组件：PascalCase (`JsonPanel.vue`)
-- Composables：`use` 前缀 (`useFormatter.ts`)
-- Store：模块名 + Store (`formatterStore`)
+- 组件：PascalCase (`FormatterView.vue`)
+- Composables：`use` 前缀 (`useEncrypt.ts`)
+- Store：模块名 + Store (`useEncryptStore`)
 - Types：PascalCase 接口，文件 kebab-case
-- CSS 类名：BEM 或 kebab-case
+- CSS 类名：BEM (`encrypt-view__toolbar`, `mode-tab--active`)
 
 ### TypeScript 严格模式
 - `strict: true`
