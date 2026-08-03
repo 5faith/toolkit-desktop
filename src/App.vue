@@ -90,11 +90,13 @@ onMounted(() => {
 
 .sidebar__icon {
   font-size: 18px;
+  line-height: 1;
   flex-shrink: 0;
 }
 
 .sidebar__name {
   font-size: 13px;
+  line-height: 1;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
