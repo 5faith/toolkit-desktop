@@ -15,7 +15,7 @@ jobs:
       matrix:
         include:
           - platform: windows-latest
-            args: '--bundles nsis,msi'
+            args: '--bundles nsis,msi --config {"bundle":{"windows":{"nsis":{"installMode":"both"}}}}'
           - platform: macos-latest
             args: '--target aarch64-apple-darwin'
           - platform: macos-latest
@@ -109,4 +109,4 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseDraft: true
           prerelease: false
-          args: '--bundles nsis --config {"bundle":{"windows":{"nsis":{"portable":true}}}}'
+          args: '--bundles nsis --config {"bundle":{"windows":{"nsis":{"installMode":"currentUser","portable":true}}}}'
