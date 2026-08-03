@@ -6,6 +6,7 @@ import timestampModule from './timestamp'
 import websocketModule from './websocket'
 import diffModule from './diff'
 import flvModule from './flv'
+import encryptModule from './encrypt'
 
 const modules: ToolModule[] = [
   formatterModule,
@@ -13,6 +14,7 @@ const modules: ToolModule[] = [
   websocketModule,
   diffModule,
   flvModule,
+  encryptModule,
 ]
 
 export function registerAllModules() {
