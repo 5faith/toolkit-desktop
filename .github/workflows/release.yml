@@ -63,9 +63,8 @@ jobs:
             ## Downloads
 
             ### Windows
-            - **Portable (.zip)**: 便携版，解压即用，无需安装
-            - **Setup (.exe)**: NSIS 安装包（推荐）
-            - **MSI (.msi)**: Windows Installer 安装包
+            - **Setup (.exe)**: NSIS installer
+            - **MSI (.msi)**: Windows Installer package
 
             ### macOS
             - **Apple Silicon (.dmg)**: For M1/M2/M3/M4 Macs
@@ -77,40 +76,3 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
-
-      - name: Create Windows portable zip
-        if: matrix.platform == 'windows-latest'
-        shell: pwsh
-        run: |
-          $version = "${{ github.ref_name }}"
-          $zipName = "Toolkit-Desktop-${version}-windows-x64-portable.zip"
-          $stagingDir = "portable-staging"
-          New-Item -ItemType Directory -Path $stagingDir
-
-          $exePath = Get-ChildItem -Path "src-tauri/target/release" -Filter "*.exe" | Where-Object { $_.Name -notlike "*bundle*" } | Select-Object -First 1
-          Copy-Item $exePath.FullName "$stagingDir/"
-
-          Compress-Archive -Path "$stagingDir/*" -DestinationPath $zipName
-          gh release upload "${{ github.ref_name }}" $zipName --clobber
-
-      - name: Create macOS x64 portable zip
-        if: matrix.platform == 'macos-latest' && contains(matrix.args, 'x86_64')
-        run: |
-          APP_PATH=$(find src-tauri/target/x86_64-apple-darwin/release/bundle -name "*.app" -type d | head -1)
-          VERSION="${{ github.ref_name }}"
-          ZIP_NAME="Toolkit-Desktop-${VERSION}-macos-x64.zip"
-          cd "$(dirname "$APP_PATH")"
-          zip -r "../../$ZIP_NAME" "$(basename "$APP_PATH")"
-          cd ../..
-          gh release upload "${{ github.ref_name }}" "$ZIP_NAME" --clobber
-
-      - name: Create macOS arm64 portable zip
-        if: matrix.platform == 'macos-latest' && contains(matrix.args, 'aarch64')
-        run: |
-          APP_PATH=$(find src-tauri/target/aarch64-apple-darwin/release/bundle -name "*.app" -type d | head -1)
-          VERSION="${{ github.ref_name }}"
-          ZIP_NAME="Toolkit-Desktop-${VERSION}-macos-arm64.zip"
-          cd "$(dirname "$APP_PATH")"
-          zip -r "../../$ZIP_NAME" "$(basename "$APP_PATH")"
-          cd ../..
-          gh release upload "${{ github.ref_name }}" "$ZIP_NAME" --clobber
