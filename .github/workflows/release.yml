@@ -80,7 +80,7 @@ jobs:
 
   build-windows-portable:
     runs-on: windows-latest
-    needs: []
+    needs: [build]
 
     steps:
       - uses: actions/checkout@v7
@@ -107,8 +107,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: Toolkit Desktop ${{ github.ref_name }}
-          releaseBody: ''
           releaseDraft: true
           prerelease: false
           args: '--bundles nsis --config {"bundle":{"windows":{"nsis":{"portable":true}}}}'
