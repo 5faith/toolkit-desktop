@@ -109,4 +109,4 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseDraft: true
           prerelease: false
-          args: '--bundles nsis --config {"bundle":{"windows":{"nsis":{"installMode":"currentUser","portable":true}}}}'
+          args: '--bundles nsis --config {"bundle":{"windows":{"nsis":{"portable":true}}}}'
