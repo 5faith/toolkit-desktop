@@ -5,18 +5,20 @@ import formatterModule from './formatter'
 import timestampModule from './timestamp'
 import websocketModule from './websocket'
 import diffModule from './diff'
-import flvModule from './flv'
+import liveModule from './flv'
 import encryptModule from './encrypt'
 import fileshareModule from './fileshare'
+import shortcutsModule from './shortcuts'
 
 const modules: ToolModule[] = [
   formatterModule,
   timestampModule,
   websocketModule,
   diffModule,
-  flvModule,
+  liveModule,
   encryptModule,
   fileshareModule,
+  shortcutsModule,
 ]
 
 export function registerAllModules() {

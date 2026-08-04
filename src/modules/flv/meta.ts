@@ -1,6 +1,6 @@
 export default {
-  id: 'flv',
-  name: 'FLV Player',
-  icon: '▶',
+  id: 'live',
+  name: 'Live Player',
+  icon: '📡',
   shortcut: 'Ctrl+5',
 }

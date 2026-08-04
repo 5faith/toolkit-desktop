@@ -11,20 +11,8 @@ declare module '*.js' {
   export default value
 }
 
-declare module '@/lib/flv.js/flv.min.js' {
-  interface FlvJsStatic {
-    isSupported(): boolean
-    createPlayer(config: Record<string, unknown>): FlvPlayerInstance
-  }
-
-  interface FlvPlayerInstance {
-    attachMediaElement(element: HTMLVideoElement): void
-    load(): void
-    play(): void
-    pause(): void
-    destroy(): void
-  }
-
-  const flvjs: FlvJsStatic
-  export default flvjs
+declare module '@/lib/mpegts.js/mpegts.min.js' {
+  import type { MpegtsStatic } from '@/lib/mpegts.js/index.d.ts'
+  const mpegts: MpegtsStatic
+  export default mpegts
 }

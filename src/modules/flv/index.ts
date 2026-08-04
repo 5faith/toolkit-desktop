@@ -1,18 +1,18 @@
 import type { ToolModule } from '@core/module'
 import meta from './meta'
-import FlvPlayerView from './components/FlvPlayerView.vue'
+import LiveView from './components/FlvPlayerView.vue'
 
-const flvModule: ToolModule = {
+const liveModule: ToolModule = {
   id: meta.id,
   name: meta.name,
   icon: meta.icon,
   shortcut: meta.shortcut,
   route: {
-    path: '/flv',
-    name: 'flv',
-    component: FlvPlayerView,
-    meta: { moduleId: 'flv' },
+    path: '/live',
+    name: 'live',
+    component: LiveView,
+    meta: { moduleId: 'live' },
   },
 }
 
-export default flvModule
+export default liveModule

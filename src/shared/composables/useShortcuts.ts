@@ -1,7 +1,7 @@
 import { onMounted, onUnmounted } from 'vue'
 import { moduleRegistry } from '@core/module-registry'
 
-export function useShortcuts() {
+export function useShortcuts(options?: { onModuleSwitch?: (id: string) => void }) {
   const handlers = new Map<string, () => void>()
 
   function handleKeydown(event: KeyboardEvent) {
@@ -29,7 +29,13 @@ export function useShortcuts() {
     const modules = moduleRegistry.getAll()
     modules.forEach(mod => {
       if (mod.shortcut) {
-        register(mod.shortcut, () => moduleRegistry.activate(mod.id))
+        register(mod.shortcut, () => {
+          if (options?.onModuleSwitch) {
+            options.onModuleSwitch(mod.id)
+          } else {
+            moduleRegistry.activate(mod.id)
+          }
+        })
       }
     })
   }
