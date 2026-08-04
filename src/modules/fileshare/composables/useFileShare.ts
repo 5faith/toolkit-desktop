@@ -21,6 +21,7 @@ async function safeInvoke<T>(cmd: string, args?: Record<string, unknown>): Promi
       ],
       open_folder: undefined,
       save_text_file: { name: 'mock.txt', size: 10 },
+      copy_file_to_upload_dir: { name: 'mock-file.txt', size: 1024 },
     }
     console.warn(`[fileshare] browser mock: invoke('${cmd}')`)
     return mocks[cmd] as T
@@ -148,13 +149,16 @@ export function useFileShare() {
     error.value = ''
     try {
       for (const fp of filePaths) {
-        const info = await safeInvoke<{ name: string; size: number }>('get_file_info', { path: fp })
+        const info = await safeInvoke<{ name: string; size: number }>('copy_file_to_upload_dir', {
+          filePath: fp,
+          uploadPath: store.settings.uploadPath,
+        })
         const file: SharedFile = {
           id: `file-${fileCounter++}`,
           name: info.name,
           size: info.size,
           ip: store.currentIp,
-          path: fp,
+          path: `${store.settings.uploadPath}/${info.name}`,
         }
         store.addFile(file)
       }

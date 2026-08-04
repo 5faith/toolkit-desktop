@@ -20,6 +20,7 @@ pub fn run() {
             commands::fileshare::get_file_info,
             commands::fileshare::open_folder,
             commands::fileshare::save_text_file,
+            commands::fileshare::copy_file_to_upload_dir,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

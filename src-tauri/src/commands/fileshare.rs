@@ -205,6 +205,31 @@ pub fn save_text_file(upload_path: String, filename: String, content: String) ->
     })
 }
 
+#[tauri::command]
+pub fn copy_file_to_upload_dir(file_path: String, upload_path: String) -> Result<FileInfo, String> {
+    let src = std::path::Path::new(&file_path);
+    if !src.exists() {
+        return Err(format!("Source file not found: {}", file_path));
+    }
+    let dir = std::path::Path::new(&upload_path);
+    if !dir.exists() {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    let filename = src
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let dest = dir.join(&filename);
+    if src != dest {
+        std::fs::copy(src, &dest).map_err(|e| e.to_string())?;
+    }
+    let meta = std::fs::metadata(&dest).map_err(|e| e.to_string())?;
+    Ok(FileInfo {
+        name: filename,
+        size: meta.len(),
+    })
+}
+
 const INDEX_HTML: &str = r#"<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>File Share</title></head>
 <body>
