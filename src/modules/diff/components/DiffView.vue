@@ -20,18 +20,7 @@
       </div>
     </div>
 
-    <div v-if="store.viewMode === 'side-by-side'" class="diff-view__inputs">
-      <div class="diff-view__input-panel">
-        <div class="panel-header">Left (Original)</div>
-        <CodeEditor v-model="store.leftText" placeholder="Paste original text..." />
-      </div>
-      <div class="diff-view__input-panel">
-        <div class="panel-header">Right (Modified)</div>
-        <CodeEditor v-model="store.rightText" placeholder="Paste modified text..." />
-      </div>
-    </div>
-
-    <div v-else class="diff-view__inputs">
+    <div class="diff-view__inputs">
       <div class="diff-view__input-panel">
         <div class="panel-header">Left (Original)</div>
         <CodeEditor v-model="store.leftText" placeholder="Paste original text..." />
@@ -44,7 +33,35 @@
 
     <div v-if="lineDiff.length > 0" class="diff-view__result">
       <div class="panel-header">Diff Result</div>
-      <div class="diff-output">
+
+      <div v-if="store.viewMode === 'side-by-side'" class="diff-side">
+        <div class="diff-side__panel">
+          <div class="diff-side__scroll">
+            <div
+              v-for="(line, i) in leftLines"
+              :key="'l' + i"
+              class="diff-line"
+              :class="{ 'diff-line--removed': line.type === 'removed' }"
+            >
+              <pre class="diff-line__text">{{ line.text }}</pre>
+            </div>
+          </div>
+        </div>
+        <div class="diff-side__panel">
+          <div class="diff-side__scroll">
+            <div
+              v-for="(line, i) in rightLines"
+              :key="'r' + i"
+              class="diff-line"
+              :class="{ 'diff-line--added': line.type === 'added' }"
+            >
+              <pre class="diff-line__text">{{ line.text }}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-else class="diff-unified">
         <div
           v-for="(change, index) in lineDiff"
           :key="index"
@@ -63,7 +80,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import type { Change } from 'diff'
 import CodeEditor from '@shared/components/CodeEditor.vue'
 import { useDiffStore } from '../store'
@@ -73,6 +90,45 @@ const store = useDiffStore()
 const { computeDiff: doCompute, computeLineDiff } = useDiff()
 
 const lineDiff = ref<Change[]>([])
+
+interface DiffLine {
+  text: string
+  type: 'added' | 'removed' | 'unchanged'
+}
+
+const leftLines = computed<DiffLine[]>(() => {
+  const result: DiffLine[] = []
+  for (const change of lineDiff.value) {
+    const lines = change.value.split('\n')
+    if (change.removed) {
+      for (const line of lines) {
+        result.push({ text: line, type: 'removed' })
+      }
+    } else if (!change.added) {
+      for (const line of lines) {
+        result.push({ text: line, type: 'unchanged' })
+      }
+    }
+  }
+  return result
+})
+
+const rightLines = computed<DiffLine[]>(() => {
+  const result: DiffLine[] = []
+  for (const change of lineDiff.value) {
+    const lines = change.value.split('\n')
+    if (change.added) {
+      for (const line of lines) {
+        result.push({ text: line, type: 'added' })
+      }
+    } else if (!change.removed) {
+      for (const line of lines) {
+        result.push({ text: line, type: 'unchanged' })
+      }
+    }
+  }
+  return result
+})
 
 function computeDiff() {
   doCompute()
@@ -136,10 +192,10 @@ function computeDiff() {
 
 .diff-view__inputs {
   display: flex;
-  flex: 1;
+  flex: 0 0 30%;
   gap: 1px;
   background: var(--color-border);
-  overflow: hidden;
+  min-height: 80px;
 }
 
 .diff-view__input-panel {
@@ -162,17 +218,40 @@ function computeDiff() {
 }
 
 .diff-view__result {
+  flex: 1;
   background: var(--color-bg-primary);
   border-top: 1px solid var(--color-border);
-  max-height: 40%;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
-.diff-output {
-  overflow-y: auto;
+.diff-side {
   flex: 1;
+  display: flex;
+  gap: 1px;
+  background: var(--color-border);
+  min-height: 0;
+}
+
+.diff-side__panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-primary);
+  min-height: 0;
+}
+
+.diff-side__scroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.diff-unified {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .diff-line {
