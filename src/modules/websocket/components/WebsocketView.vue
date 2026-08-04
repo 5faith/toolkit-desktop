@@ -16,10 +16,17 @@
       </button>
       <button class="action-btn" @click="store.clearMessages()">Clear</button>
       <button class="action-btn" @click="exportLog">Export</button>
+      <button
+        class="action-btn"
+        :class="{ 'action-btn--active': store.autoBottom }"
+        @click="store.setAutoBottom(!store.autoBottom)"
+      >
+        ↓ Auto
+      </button>
     </div>
 
     <div class="websocket-view__body">
-      <div class="websocket-view__messages">
+      <div ref="messagesRef" class="websocket-view__messages">
         <div
           v-for="msg in store.messages"
           :key="msg.id"
@@ -54,7 +61,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, nextTick, watch } from 'vue'
 import { useWebsocketStore } from '../store'
 import { useWebSocket } from '../composables/useWebSocket'
 import { useMessageLog } from '../composables/useMessageLog'
@@ -66,6 +73,20 @@ const { exportMessages } = useMessageLog()
 const { copy } = useClipboard()
 
 const sendText = ref('')
+const messagesRef = ref<HTMLDivElement>()
+
+watch(
+  () => store.messages.length,
+  () => {
+    if (store.autoBottom) {
+      nextTick(() => {
+        if (messagesRef.value) {
+          messagesRef.value.scrollTop = messagesRef.value.scrollHeight
+        }
+      })
+    }
+  },
+)
 
 function toggleConnection() {
   if (store.connected) {
@@ -152,6 +173,12 @@ function formatTime(ts: number): string {
 .action-btn--danger {
   color: var(--color-error);
   border-color: var(--color-error);
+}
+
+.action-btn--active {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: var(--color-accent);
 }
 
 .websocket-view__body {

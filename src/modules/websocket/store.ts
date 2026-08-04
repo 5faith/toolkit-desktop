@@ -12,6 +12,7 @@ export const useWebsocketStore = defineStore('websocket', () => {
   const url = ref('ws://localhost:8080')
   const connected = ref(false)
   const messages = ref<WsMessage[]>([])
+  const autoBottom = ref(true)
 
   function setUrl(u: string) {
     url.value = u
@@ -29,13 +30,19 @@ export const useWebsocketStore = defineStore('websocket', () => {
     messages.value = []
   }
 
+  function setAutoBottom(v: boolean) {
+    autoBottom.value = v
+  }
+
   return {
     url,
     connected,
     messages,
+    autoBottom,
     setUrl,
     setConnected,
     addMessage,
     clearMessages,
+    setAutoBottom,
   }
 })
