@@ -199,6 +199,7 @@ const {
   error, interfaces, selectedIp,
   loadInterfaces, selectIp, startServer, stopServer,
   refreshLink, copyLink, copyDownloadLink, openFolder, shareText, pickFiles,
+  removeFile, clearFiles,
 } = useFileShare()
 const notification = useNotification()
 
@@ -239,14 +240,14 @@ async function onCopyDownloadLink(file: SharedFile) {
 async function onRemoveFile(file: SharedFile) {
   const confirmed = await confirm(`确定删除「${file.name}」？`, { title: '删除确认', kind: 'warning' })
   if (confirmed) {
-    store.removeFile(file.id)
+    await removeFile(file)
   }
 }
 
 async function onClearFiles() {
   const confirmed = await confirm('确定清空所有分享文件？', { title: '清空确认', kind: 'warning' })
   if (confirmed) {
-    store.clearFiles()
+    await clearFiles()
   }
 }
 

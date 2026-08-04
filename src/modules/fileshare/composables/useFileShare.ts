@@ -21,7 +21,9 @@ async function safeInvoke<T>(cmd: string, args?: Record<string, unknown>): Promi
       ],
       open_folder: undefined,
       save_text_file: { name: 'mock.txt', size: 10 },
-      copy_file_to_upload_dir: { name: 'mock-file.txt', size: 1024 },
+      register_shared_file: { name: 'mock-file.txt', size: 1024 },
+      unregister_shared_file: undefined,
+      clear_shared_files_registry: undefined,
     }
     console.warn(`[fileshare] browser mock: invoke('${cmd}')`)
     return mocks[cmd] as T
@@ -115,7 +117,7 @@ export function useFileShare() {
   }
 
   async function copyDownloadLink(file: SharedFile) {
-    const url = `${store.shareLink}/uploads/${encodeURIComponent(file.name)}`
+    const url = `${store.shareLink}/file/${encodeURIComponent(file.name)}`
     await navigator.clipboard.writeText(url)
   }
 
@@ -132,6 +134,7 @@ export function useFileShare() {
         filename,
         content: text,
       })
+      await safeInvoke('register_shared_file', { filePath: `${store.settings.uploadPath}/${info.name}` })
       const file: SharedFile = {
         id: `file-${fileCounter++}`,
         name: info.name,
@@ -149,22 +152,29 @@ export function useFileShare() {
     error.value = ''
     try {
       for (const fp of filePaths) {
-        const info = await safeInvoke<{ name: string; size: number }>('copy_file_to_upload_dir', {
-          filePath: fp,
-          uploadPath: store.settings.uploadPath,
-        })
+        const info = await safeInvoke<{ name: string; size: number }>('register_shared_file', { filePath: fp })
         const file: SharedFile = {
           id: `file-${fileCounter++}`,
           name: info.name,
           size: info.size,
           ip: store.currentIp,
-          path: `${store.settings.uploadPath}/${info.name}`,
+          path: fp,
         }
         store.addFile(file)
       }
     } catch (e) {
       error.value = String(e)
     }
+  }
+
+  async function removeFile(file: SharedFile) {
+    await safeInvoke('unregister_shared_file', { filename: file.name })
+    store.removeFile(file.id)
+  }
+
+  async function clearFiles() {
+    await safeInvoke('clear_shared_files_registry')
+    store.clearFiles()
   }
 
   async function pickFiles() {
@@ -194,6 +204,8 @@ export function useFileShare() {
     openFolder,
     shareText,
     addFiles,
+    removeFile,
+    clearFiles,
     pickFiles,
   }
 }

@@ -1,13 +1,19 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 use tokio::sync::oneshot;
 
 static SHUTDOWN_TX: OnceLock<Mutex<Option<oneshot::Sender<()>>>> = OnceLock::new();
+static SHARED_FILES: OnceLock<Mutex<HashMap<String, PathBuf>>> = OnceLock::new();
 
 fn get_shutdown_sender() -> &'static Mutex<Option<oneshot::Sender<()>>> {
     SHUTDOWN_TX.get_or_init(|| Mutex::new(None))
+}
+
+fn get_shared_files() -> &'static Mutex<HashMap<String, PathBuf>> {
+    SHARED_FILES.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 #[derive(Deserialize)]
@@ -48,6 +54,10 @@ pub async fn start_file_share(settings: FileShareSettings) -> Result<(), String>
         .nest_service(
             "/uploads",
             tower_http::services::ServeDir::new(&upload_dir),
+        )
+        .route(
+            "/file/{filename}",
+            axum::routing::get(serve_shared_file),
         )
         .route(
             "/upload",
@@ -228,6 +238,73 @@ pub fn copy_file_to_upload_dir(file_path: String, upload_path: String) -> Result
         name: filename,
         size: meta.len(),
     })
+}
+
+#[tauri::command]
+pub fn register_shared_file(file_path: String) -> Result<FileInfo, String> {
+    let path = PathBuf::from(&file_path);
+    if !path.exists() {
+        return Err(format!("File not found: {}", file_path));
+    }
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let meta = std::fs::metadata(&path).map_err(|e| e.to_string())?;
+    let mut files = get_shared_files().lock().map_err(|e| e.to_string())?;
+    files.insert(name.clone(), path);
+    Ok(FileInfo {
+        name,
+        size: meta.len(),
+    })
+}
+
+#[tauri::command]
+pub fn unregister_shared_file(filename: String) -> Result<(), String> {
+    let mut files = get_shared_files().lock().map_err(|e| e.to_string())?;
+    files.remove(&filename);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn clear_shared_files_registry() -> Result<(), String> {
+    let mut files = get_shared_files().lock().map_err(|e| e.to_string())?;
+    files.clear();
+    Ok(())
+}
+
+async fn serve_shared_file(
+    axum::extract::Path(filename): axum::extract::Path<String>,
+) -> Result<axum::response::Response, axum::http::StatusCode> {
+    let path = {
+        let files = get_shared_files()
+            .lock()
+            .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+        files
+            .get(&filename)
+            .cloned()
+            .ok_or(axum::http::StatusCode::NOT_FOUND)?
+    };
+
+    if !path.exists() {
+        return Err(axum::http::StatusCode::NOT_FOUND);
+    }
+
+    let data = tokio::fs::read(&path)
+        .await
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let mime = mime_guess::from_path(&path).first_or_octet_stream();
+
+    Ok(axum::response::Response::builder()
+        .status(200)
+        .header("content-type", mime.as_ref())
+        .header(
+            "content-disposition",
+            format!("inline; filename=\"{}\"", filename),
+        )
+        .body(axum::body::Body::from(data))
+        .unwrap())
 }
 
 const INDEX_HTML: &str = r#"<!DOCTYPE html>
