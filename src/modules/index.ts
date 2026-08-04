@@ -7,6 +7,7 @@ import websocketModule from './websocket'
 import diffModule from './diff'
 import flvModule from './flv'
 import encryptModule from './encrypt'
+import fileshareModule from './fileshare'
 
 const modules: ToolModule[] = [
   formatterModule,
@@ -15,6 +16,7 @@ const modules: ToolModule[] = [
   diffModule,
   flvModule,
   encryptModule,
+  fileshareModule,
 ]
 
 export function registerAllModules() {

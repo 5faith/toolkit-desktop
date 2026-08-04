@@ -11,6 +11,10 @@ pub fn run() {
             commands::timestamp::convert_timestamp,
             commands::diff::compute_diff,
             commands::flv::read_local_file,
+            commands::fileshare::start_file_share,
+            commands::fileshare::stop_file_share,
+            commands::fileshare::get_local_ip,
+            commands::fileshare::get_file_info,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,6 +1,6 @@
 [package]
 name = "toolkit-desktop"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 
 [lib]
@@ -17,3 +17,8 @@ serde_json = "1"
 chrono = "0.4"
 quick-xml = "0.36"
 similar = "2"
+axum = { version = "0.8", features = ["multipart"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
+tower-http = { version = "0.6", features = ["fs", "cors"] }
+local-ip-address = "0.6"
+uuid = { version = "1", features = ["v4"] }
