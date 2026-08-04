@@ -23,7 +23,18 @@
             <span class="fs-link-value">{{ store.shareLink }}</span>
             <div class="fs-link-actions">
               <button class="btn btn--outline" @click="copyLink">🔗 复制链接</button>
-              <button class="btn btn--outline" @click="refreshLink">📶 切换网卡</button>
+              <div class="fs-nic-select">
+                <span class="fs-nic-label">网卡:</span>
+                <select class="fs-nic-dropdown" :value="selectedIp" @change="onNicChange">
+                  <option
+                    v-for="iface in interfaces"
+                    :key="iface.ip"
+                    :value="iface.ip"
+                  >
+                    {{ iface.name }} — {{ iface.ip }}{{ iface.is_ipv6 ? ' (IPv6)' : '' }}
+                  </option>
+                </select>
+              </div>
               <button class="btn btn--outline" @click="switchIpv6">
                 📶 切换ipv{{ store.useIpv6 ? '6' : '4' }}
               </button>
@@ -145,19 +156,28 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useFileshareStore, type SettingsErrors } from '../store'
 import { useFileShare } from '../composables/useFileShare'
 
 const store = useFileshareStore()
-const { error, startServer, stopServer, refreshLink, copyLink, addFiles } = useFileShare()
+const { error, interfaces, selectedIp, loadInterfaces, selectIp, startServer, stopServer, refreshLink, copyLink, addFiles } = useFileShare()
 
 const fileInputRef = ref<HTMLInputElement>()
 const errors = reactive<SettingsErrors>({})
 
+onMounted(() => {
+  loadInterfaces()
+})
+
 function switchIpv6() {
   store.toggleIpv6()
   refreshLink()
+}
+
+function onNicChange(event: Event) {
+  const ip = (event.target as HTMLSelectElement).value
+  selectIp(ip)
 }
 
 function openFileDialog() {
@@ -620,5 +640,33 @@ function closeSettings() {
   gap: var(--spacing-sm);
   padding: var(--spacing-md) var(--spacing-lg);
   border-top: 1px solid var(--color-border);
+}
+
+.fs-nic-select {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.fs-nic-label {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.fs-nic-dropdown {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  outline: none;
+  cursor: pointer;
+  max-width: 280px;
+}
+
+.fs-nic-dropdown:focus {
+  border-color: var(--color-accent);
 }
 </style>

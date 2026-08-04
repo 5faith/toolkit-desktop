@@ -9,6 +9,12 @@ export interface SharedFile {
   ip: string
 }
 
+export interface NetworkInterface {
+  name: string
+  ip: string
+  is_ipv6: boolean
+}
+
 export interface FileShareSettings {
   autoStart: boolean
   uploadPath: string

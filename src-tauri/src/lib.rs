@@ -15,6 +15,7 @@ pub fn run() {
             commands::fileshare::start_file_share,
             commands::fileshare::stop_file_share,
             commands::fileshare::get_local_ip,
+            commands::fileshare::list_network_interfaces,
             commands::fileshare::get_file_info,
         ])
         .run(tauri::generate_context!())

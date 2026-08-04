@@ -94,6 +94,30 @@ pub async fn stop_file_share() -> Result<(), String> {
     Ok(())
 }
 
+#[derive(Serialize, Clone)]
+pub struct NetworkInterface {
+    pub name: String,
+    pub ip: String,
+    pub is_ipv6: bool,
+}
+
+#[tauri::command]
+pub fn list_network_interfaces() -> Result<Vec<NetworkInterface>, String> {
+    let ifaces = local_ip_address::list_afinet_netifas().map_err(|e| e.to_string())?;
+    let mut result: Vec<NetworkInterface> = Vec::new();
+    for (name, ip) in &ifaces {
+        if ip.is_loopback() {
+            continue;
+        }
+        result.push(NetworkInterface {
+            name: name.clone(),
+            ip: ip.to_string(),
+            is_ipv6: ip.is_ipv6(),
+        });
+    }
+    Ok(result)
+}
+
 #[tauri::command]
 pub fn get_local_ip(use_ipv6: bool) -> Result<String, String> {
     if use_ipv6 {
