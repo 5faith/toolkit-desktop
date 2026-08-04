@@ -13,6 +13,7 @@ pub fn run() {
             commands::timestamp::get_system_timestamp,
             commands::timestamp::convert_timestamp,
             commands::diff::compute_diff,
+            commands::exif::read_image_exif,
             commands::flv::read_local_file,
             commands::live::start_stream_proxy,
             commands::live::stop_stream_proxy,

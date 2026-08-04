@@ -410,3 +410,26 @@ In repositories indexed by CodeGraph (a `.codegraph/` directory exists at the re
 - **Shell** (always works): `codegraph explore "<symbol names or question>"` prints the same output.
 
 If there is no `.codegraph/` directory, skip CodeGraph entirely — indexing is the user's decision.
+
+---
+
+## Rust 侧已知问题
+
+### kamadak-exif API 注意事项 (v0.5)
+
+`kamadak-exif` crate 的 `Field` 类型 API 与直觉不符：
+
+- **`field.rational()` 和 `field.get_uint()` 是私有方法**，不能直接调用
+- 正确方式：使用 `field.value.rational()` 和 `field.value.get_uint(0)`，其中 `field.value` 是 `exif::Value` 类型
+- 简单字段（字符串类）直接用 `field.display_value().to_string()` 即可
+- Tag 枚举名与常见命名不同：`ISOSpeedRatings` 在此 crate 中是 `Tag::ISOSpeed`
+- 建议封装 `get_display()` 辅助函数统一处理字符串类字段
+
+#### Tag 枚举名陷阱
+- `Tag::SerialNumber` 不存在 → 用 `Tag::BodySerialNumber`
+- `Tag::LensSerialNumber` 可正常工作
+- 类似地，其他 Tag 名称也可能与常见命名不同，编译器报错时按提示的 similar name 修正
+
+### WSL 环境限制
+
+`cargo check` / `cargo clippy` 在 WSL 上会因缺少 GTK 系统依赖（`pkg-config`, `libgtk-3-dev`, `libglib2.0-dev` 等）而失败。这是环境问题，不是代码问题。CI/CD 在 Windows 上构建不受影响。

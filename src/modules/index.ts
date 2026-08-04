@@ -7,6 +7,7 @@ import websocketModule from './websocket'
 import diffModule from './diff'
 import liveModule from './flv'
 import encryptModule from './encrypt'
+import exifModule from './exif'
 import fileshareModule from './fileshare'
 import shortcutsModule from './shortcuts'
 
@@ -17,6 +18,7 @@ const modules: ToolModule[] = [
   diffModule,
   liveModule,
   encryptModule,
+  exifModule,
   fileshareModule,
   shortcutsModule,
 ]
