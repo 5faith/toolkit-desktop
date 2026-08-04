@@ -3803,6 +3803,7 @@ dependencies = [
  "axum",
  "chrono",
  "local-ip-address",
+ "mime_guess",
  "quick-xml 0.36.2",
  "serde",
  "serde_json",
