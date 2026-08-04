@@ -164,6 +164,47 @@ async fn handle_upload(
     Ok(axum::Json(serde_json::json!({ "ok": true })))
 }
 
+#[tauri::command]
+pub fn open_folder(path: &str) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn save_text_file(upload_path: String, filename: String, content: String) -> Result<FileInfo, String> {
+    let dir = std::path::Path::new(&upload_path);
+    if !dir.exists() {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    let file_path = dir.join(&filename);
+    std::fs::write(&file_path, content).map_err(|e| e.to_string())?;
+    let meta = std::fs::metadata(&file_path).map_err(|e| e.to_string())?;
+    Ok(FileInfo {
+        name: filename,
+        size: meta.len(),
+    })
+}
+
 const INDEX_HTML: &str = r#"<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>File Share</title></head>
 <body>

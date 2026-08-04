@@ -17,6 +17,8 @@ pub fn run() {
             commands::fileshare::get_local_ip,
             commands::fileshare::list_network_interfaces,
             commands::fileshare::get_file_info,
+            commands::fileshare::open_folder,
+            commands::fileshare::save_text_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

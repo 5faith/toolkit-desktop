@@ -4,6 +4,7 @@
       <div class="fileshare-view__idle">
         <button class="settings-btn" @click="store.toggleSettings()">⚙ 设置</button>
         <button class="start-btn" @click="startServer">开启服务</button>
+        <button class="open-dir-btn" @click="openFolder()">📁 打开上传目录</button>
         <div v-if="error" class="fs-error">{{ error }}</div>
       </div>
     </template>
@@ -46,7 +47,8 @@
           <div class="fs-card__header">
             <span class="fs-list-title">分享列表</span>
             <div class="fs-list-actions">
-              <button class="btn btn--outline" @click="shareText">✉ 分享文本</button>
+              <button class="btn btn--outline" @click="showShareText = true">✉ 分享文本</button>
+              <button class="btn btn--outline" @click="openFolder()">📁 打开上传目录</button>
               <button class="btn btn--outline" @click="store.clearFiles()">🗑 清空列表</button>
             </div>
           </div>
@@ -63,19 +65,52 @@
 
             <div class="fs-file-list">
               <div v-for="file in store.sharedFiles" :key="file.id" class="fs-file-row">
-                <span class="fs-file-ip">{{ file.ip }}</span>
                 <span class="fs-file-name">{{ file.name }}</span>
+                <span class="fs-file-size">{{ formatFileSize(file.size) }}</span>
                 <div class="fs-file-actions">
-                  <button class="btn-icon" title="复制下载链接">🔗</button>
-                  <button class="btn-icon" title="打开文件夹">📁</button>
+                  <button class="btn-icon" title="复制下载链接" @click="copyDownloadLink(file)">🔗</button>
+                  <button class="btn-icon" title="打开文件夹" @click="openFolderForFile(file)">📁</button>
                   <button class="btn-icon" title="删除" @click="store.removeFile(file.id)">🗑</button>
                 </div>
+              </div>
+              <div v-if="store.sharedFiles.length === 0" class="fs-file-empty">
+                暂无分享文件
               </div>
             </div>
           </div>
         </div>
       </div>
     </template>
+
+    <div v-if="showShareText" class="fs-settings-overlay" @click.self="closeShareText">
+      <div class="fs-settings-dialog">
+        <div class="fs-settings-dialog__header">
+          <span>分享文本</span>
+          <button class="fs-settings-dialog__close" @click="closeShareText">✕</button>
+        </div>
+        <div class="fs-settings-dialog__body">
+          <div class="fs-setting-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
+            <input
+              class="fs-setting-input"
+              style="width: 100%;"
+              placeholder="文件名 (例: note.txt)"
+              :value="shareTextFilename"
+              @input="shareTextFilename = ($event.target as HTMLInputElement).value"
+            />
+            <textarea
+              class="fs-textarea"
+              placeholder="输入要分享的文本内容..."
+              :value="shareTextContent"
+              @input="shareTextContent = ($event.target as HTMLTextAreaElement).value"
+            />
+          </div>
+        </div>
+        <div class="fs-settings-dialog__footer">
+          <button class="btn btn--primary" @click="confirmShareText">分享</button>
+          <button class="btn btn--outline" @click="closeShareText">取消</button>
+        </div>
+      </div>
+    </div>
 
     <div v-if="store.showSettings" class="fs-settings-overlay" @click.self="closeSettings">
       <div class="fs-settings-dialog">
@@ -157,14 +192,21 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { useFileshareStore, type SettingsErrors } from '../store'
+import { useFileshareStore, type SharedFile, type SettingsErrors } from '../store'
 import { useFileShare } from '../composables/useFileShare'
 
 const store = useFileshareStore()
-const { error, interfaces, selectedIp, loadInterfaces, selectIp, startServer, stopServer, refreshLink, copyLink, addFiles } = useFileShare()
+const {
+  error, interfaces, selectedIp,
+  loadInterfaces, selectIp, startServer, stopServer,
+  refreshLink, copyLink, copyDownloadLink, openFolder, shareText, addFiles,
+} = useFileShare()
 
 const fileInputRef = ref<HTMLInputElement>()
 const errors = reactive<SettingsErrors>({})
+const showShareText = ref(false)
+const shareTextFilename = ref('note.txt')
+const shareTextContent = ref('')
 
 onMounted(() => {
   loadInterfaces()
@@ -211,8 +253,30 @@ function onDrop(event: DragEvent) {
   }
 }
 
-function shareText() {
-  copyLink()
+function openFolderForFile(file: SharedFile) {
+  const dir = file.path.substring(0, file.path.lastIndexOf('/')) || file.path.substring(0, file.path.lastIndexOf('\\'))
+  openFolder(dir || undefined)
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`
+}
+
+function confirmShareText() {
+  if (!shareTextContent.value.trim()) return
+  const filename = shareTextFilename.value.trim() || 'note.txt'
+  shareText(shareTextContent.value, filename)
+  closeShareText()
+}
+
+function closeShareText() {
+  showShareText.value = false
+  shareTextContent.value = ''
+  shareTextFilename.value = 'note.txt'
 }
 
 function onUploadPathInput(event: Event) {
@@ -299,6 +363,23 @@ function closeSettings() {
 
 .settings-btn:hover {
   background: var(--color-bg-hover);
+}
+
+.open-dir-btn {
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+
+.open-dir-btn:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-hover);
 }
 
 .fs-error {
@@ -460,13 +541,6 @@ function closeSettings() {
   background: var(--color-bg-hover);
 }
 
-.fs-file-ip {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--color-text-tertiary);
-  min-width: 100px;
-}
-
 .fs-file-name {
   flex: 1;
   font-size: 13px;
@@ -474,6 +548,21 @@ function closeSettings() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.fs-file-size {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  min-width: 70px;
+  text-align: right;
+}
+
+.fs-file-empty {
+  padding: var(--spacing-lg);
+  text-align: center;
+  color: var(--color-text-tertiary);
+  font-size: 13px;
 }
 
 .fs-file-actions {
@@ -565,6 +654,24 @@ function closeSettings() {
 }
 
 .fs-setting-input:focus {
+  border-color: var(--color-accent);
+}
+
+.fs-textarea {
+  width: 100%;
+  min-height: 160px;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  outline: none;
+  resize: vertical;
+  font-family: var(--font-mono);
+}
+
+.fs-textarea:focus {
   border-color: var(--color-accent);
 }
 

@@ -7,6 +7,7 @@ export interface SharedFile {
   name: string
   size: number
   ip: string
+  path: string
 }
 
 export interface NetworkInterface {

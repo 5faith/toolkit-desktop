@@ -4,13 +4,10 @@ import { useFileshareStore, type SharedFile, type NetworkInterface } from '../st
 
 let fileCounter = 0
 
-/** 是否运行在 Tauri 原生窗口中（浏览器中 __TAURI_INTERNALS__ 不存在） */
 const isTauri = !!(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__
 
-/** 安全调用 invoke：浏览器环境返回 mock 值，Tauri 环境正常 IPC */
 async function safeInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (!isTauri) {
-    // 浏览器 mock
     const mocks: Record<string, unknown> = {
       start_file_share: undefined,
       stop_file_share: undefined,
@@ -21,6 +18,8 @@ async function safeInvoke<T>(cmd: string, args?: Record<string, unknown>): Promi
         { name: 'Wi-Fi', ip: '192.168.0.50', is_ipv6: false },
         { name: 'Ethernet', ip: 'fe80::1', is_ipv6: true },
       ],
+      open_folder: undefined,
+      save_text_file: { name: 'mock.txt', size: 10 },
     }
     console.warn(`[fileshare] browser mock: invoke('${cmd}')`)
     return mocks[cmd] as T
@@ -113,6 +112,37 @@ export function useFileShare() {
     await navigator.clipboard.writeText(store.shareLink)
   }
 
+  async function copyDownloadLink(file: SharedFile) {
+    const url = `${store.shareLink}/uploads/${encodeURIComponent(file.name)}`
+    await navigator.clipboard.writeText(url)
+  }
+
+  async function openFolder(path?: string) {
+    const target = path || store.settings.uploadPath
+    await safeInvoke('open_folder', { path: target })
+  }
+
+  async function shareText(text: string, filename: string) {
+    error.value = ''
+    try {
+      const info = await safeInvoke<{ name: string; size: number }>('save_text_file', {
+        uploadPath: store.settings.uploadPath,
+        filename,
+        content: text,
+      })
+      const file: SharedFile = {
+        id: `file-${fileCounter++}`,
+        name: info.name,
+        size: info.size,
+        ip: store.currentIp,
+        path: `${store.settings.uploadPath}/${info.name}`,
+      }
+      store.addFile(file)
+    } catch (e) {
+      error.value = String(e)
+    }
+  }
+
   async function addFiles(filePaths: string[]) {
     error.value = ''
     try {
@@ -123,6 +153,7 @@ export function useFileShare() {
           name: info.name,
           size: info.size,
           ip: store.currentIp,
+          path: fp,
         }
         store.addFile(file)
       }
@@ -141,6 +172,9 @@ export function useFileShare() {
     stopServer,
     refreshLink,
     copyLink,
+    copyDownloadLink,
+    openFolder,
+    shareText,
     addFiles,
   }
 }
