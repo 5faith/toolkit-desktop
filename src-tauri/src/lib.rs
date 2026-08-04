@@ -2,6 +2,7 @@ pub mod commands;
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_store::Builder::default().build())
         .invoke_handler(tauri::generate_handler![
             commands::formatter::format_json,
             commands::formatter::format_xml,

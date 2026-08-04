@@ -1,8 +1,8 @@
-import { ref, computed, watchEffect } from 'vue'
+import { ref, computed, watchEffect, onMounted } from 'vue'
 import type { ThemeMode } from '@shared/types/common'
 import { getStorageItem, setStorageItem } from '@shared/utils/storage'
 
-const mode = ref<ThemeMode>(getStorageItem('theme', 'system'))
+const mode = ref<ThemeMode>('system')
 
 const isDark = computed(() => {
   if (mode.value === 'system') {
@@ -16,6 +16,11 @@ function applyTheme() {
 }
 
 watchEffect(() => {
+  applyTheme()
+})
+
+onMounted(async () => {
+  mode.value = await getStorageItem<ThemeMode>('theme', 'system')
   applyTheme()
 })
 

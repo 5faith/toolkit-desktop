@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { getStorageItem, setStorageItem } from '@shared/utils/storage'
 
 export interface SharedFile {
@@ -40,8 +40,13 @@ export const useFileshareStore = defineStore('fileshare', () => {
   const useIpv6 = ref(false)
   const sharedFiles = ref<SharedFile[]>([])
 
-  const settings = ref<FileShareSettings>(getStorageItem(SETTINGS_KEY, { ...defaultSettings }))
+  const settings = ref<FileShareSettings>({ ...defaultSettings })
   const showSettings = ref(false)
+
+  onMounted(async () => {
+    const saved = await getStorageItem<FileShareSettings>(SETTINGS_KEY, { ...defaultSettings })
+    settings.value = saved
+  })
 
   watch(settings, (v) => {
     setStorageItem(SETTINGS_KEY, v)
