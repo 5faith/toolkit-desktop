@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { open } from '@tauri-apps/plugin-dialog'
 import { useFileshareStore, type SharedFile, type NetworkInterface } from '../store'
 
 let fileCounter = 0
@@ -162,6 +163,19 @@ export function useFileShare() {
     }
   }
 
+  async function pickFiles() {
+    const selected = await open({
+      multiple: true,
+      directory: false,
+    })
+    if (selected) {
+      const paths = Array.isArray(selected) ? selected : [selected]
+      if (paths.length > 0) {
+        await addFiles(paths)
+      }
+    }
+  }
+
   return {
     error,
     interfaces,
@@ -176,5 +190,6 @@ export function useFileShare() {
     openFolder,
     shareText,
     addFiles,
+    pickFiles,
   }
 }

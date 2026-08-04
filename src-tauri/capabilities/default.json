@@ -4,6 +4,12 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
-    "store:default"
+    "store:default",
+    "dialog:default",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "dialog:allow-message",
+    "dialog:allow-ask",
+    "dialog:allow-confirm"
   ]
 }

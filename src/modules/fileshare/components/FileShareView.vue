@@ -55,12 +55,9 @@
           <div class="fs-card__body">
             <div
               class="fs-dropzone"
-              @dragover.prevent
-              @drop.prevent="onDrop"
-              @click="openFileDialog"
+              @click="pickFiles"
             >
-              <input ref="fileInputRef" type="file" multiple hidden @change="onFileSelect" />
-              拖拽文件或文件夹到此处或点击<span class="fs-dropzone__link">选择文件</span>，进行分享~
+              点击<span class="fs-dropzone__link">选择文件</span>进行分享~
             </div>
 
             <div class="fs-file-list">
@@ -199,10 +196,9 @@ const store = useFileshareStore()
 const {
   error, interfaces, selectedIp,
   loadInterfaces, selectIp, startServer, stopServer,
-  refreshLink, copyLink, copyDownloadLink, openFolder, shareText, addFiles,
+  refreshLink, copyLink, copyDownloadLink, openFolder, shareText, pickFiles,
 } = useFileShare()
 
-const fileInputRef = ref<HTMLInputElement>()
 const errors = reactive<SettingsErrors>({})
 const showShareText = ref(false)
 const shareTextFilename = ref('note.txt')
@@ -220,37 +216,6 @@ function switchIpv6() {
 function onNicChange(event: Event) {
   const ip = (event.target as HTMLSelectElement).value
   selectIp(ip)
-}
-
-function openFileDialog() {
-  fileInputRef.value?.click()
-}
-
-function onFileSelect(event: Event) {
-  const input = event.target as HTMLInputElement
-  if (input.files) {
-    const paths = Array.from(input.files).map(f => (f as unknown as { path: string }).path).filter(Boolean)
-    if (paths.length > 0) {
-      addFiles(paths)
-    }
-    input.value = ''
-  }
-}
-
-function onDrop(event: DragEvent) {
-  const items = event.dataTransfer?.items
-  if (!items) return
-  const paths: string[] = []
-  for (let i = 0; i < items.length; i++) {
-    const entry = items[i].webkitGetAsEntry?.()
-    if (entry) {
-      const p = (entry as unknown as { path?: string }).path
-      if (p) paths.push(p)
-    }
-  }
-  if (paths.length > 0) {
-    addFiles(paths)
-  }
 }
 
 function openFolderForFile(file: SharedFile) {
