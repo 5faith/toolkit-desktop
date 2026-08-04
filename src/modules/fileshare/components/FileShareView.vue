@@ -23,7 +23,7 @@
             <span class="fs-link-label">分享链接:</span>
             <span class="fs-link-value">{{ store.shareLink }}</span>
             <div class="fs-link-actions">
-              <button class="btn btn--outline" @click="copyLink">🔗 复制链接</button>
+              <button class="btn btn--outline" @click="onCopyLink">🔗 复制链接</button>
               <div class="fs-nic-select">
                 <span class="fs-nic-label">网卡:</span>
                 <select class="fs-nic-dropdown" :value="selectedIp" @change="onNicChange">
@@ -49,7 +49,7 @@
             <div class="fs-list-actions">
               <button class="btn btn--outline" @click="showShareText = true">✉ 分享文本</button>
               <button class="btn btn--outline" @click="openFolder()">📁 打开上传目录</button>
-              <button class="btn btn--outline" @click="store.clearFiles()">🗑 清空列表</button>
+              <button class="btn btn--outline" @click="onClearFiles">🗑 清空列表</button>
             </div>
           </div>
           <div class="fs-card__body">
@@ -65,9 +65,9 @@
                 <span class="fs-file-name">{{ file.name }}</span>
                 <span class="fs-file-size">{{ formatFileSize(file.size) }}</span>
                 <div class="fs-file-actions">
-                  <button class="btn-icon" title="复制下载链接" @click="copyDownloadLink(file)">🔗</button>
+                  <button class="btn-icon" title="复制下载链接" @click="onCopyDownloadLink(file)">🔗</button>
                   <button class="btn-icon" title="打开文件夹" @click="openFolderForFile(file)">📁</button>
-                  <button class="btn-icon" title="删除" @click="store.removeFile(file.id)">🗑</button>
+                  <button class="btn-icon" title="删除" @click="onRemoveFile(file)">🗑</button>
                 </div>
               </div>
               <div v-if="store.sharedFiles.length === 0" class="fs-file-empty">
@@ -189,8 +189,10 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
+import { confirm } from '@tauri-apps/plugin-dialog'
 import { useFileshareStore, type SharedFile, type SettingsErrors } from '../store'
 import { useFileShare } from '../composables/useFileShare'
+import { useNotification } from '@shared/composables/useNotification'
 
 const store = useFileshareStore()
 const {
@@ -198,6 +200,7 @@ const {
   loadInterfaces, selectIp, startServer, stopServer,
   refreshLink, copyLink, copyDownloadLink, openFolder, shareText, pickFiles,
 } = useFileShare()
+const notification = useNotification()
 
 const errors = reactive<SettingsErrors>({})
 const showShareText = ref(false)
@@ -221,6 +224,30 @@ function onNicChange(event: Event) {
 function openFolderForFile(file: SharedFile) {
   const dir = file.path.substring(0, file.path.lastIndexOf('/')) || file.path.substring(0, file.path.lastIndexOf('\\'))
   openFolder(dir || undefined)
+}
+
+async function onCopyLink() {
+  await copyLink()
+  notification.success('链接已复制')
+}
+
+async function onCopyDownloadLink(file: SharedFile) {
+  await copyDownloadLink(file)
+  notification.success('下载链接已复制')
+}
+
+async function onRemoveFile(file: SharedFile) {
+  const confirmed = await confirm(`确定删除「${file.name}」？`, { title: '删除确认', kind: 'warning' })
+  if (confirmed) {
+    store.removeFile(file.id)
+  }
+}
+
+async function onClearFiles() {
+  const confirmed = await confirm('确定清空所有分享文件？', { title: '清空确认', kind: 'warning' })
+  if (confirmed) {
+    store.clearFiles()
+  }
 }
 
 function formatFileSize(bytes: number): string {

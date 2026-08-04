@@ -21,6 +21,8 @@
 
     <router-view />
 
+    <NotificationContainer />
+
     <template #statusbar>
       <StatusBar :active-module-name="activeModule?.name">
         {{ activeModule?.shortcut ? `Shortcut: ${activeModule.shortcut}` : '' }}
@@ -34,6 +36,7 @@ import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import ToolShell from '@shared/components/ToolShell.vue'
 import StatusBar from '@shared/components/StatusBar.vue'
+import NotificationContainer from '@shared/components/NotificationContainer.vue'
 import { useAppStore } from '@/stores/app'
 import { useModule } from '@shared/composables/useModule'
 import { useShortcuts } from '@shared/composables/useShortcuts'
