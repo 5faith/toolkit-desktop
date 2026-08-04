@@ -1,4 +1,5 @@
 import { ref, onUnmounted } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
 import { useLiveStore, type StreamProtocol } from '../store'
 import type { MpegtsPlayer, MpegtsStatic } from '@/lib/mpegts.js/index.d.ts'
 
@@ -8,10 +9,15 @@ const PROTOCOL_TO_MPEGTS_TYPE: Record<StreamProtocol, string> = {
   'rtsp': 'flv',
 }
 
+function needsProxy(protocol: StreamProtocol): boolean {
+  return protocol === 'rtmp' || protocol === 'rtsp'
+}
+
 export function useLivePlayer() {
   const store = useLiveStore()
   const error = ref('')
   const mpegtsRef = ref<MpegtsStatic | null>(null)
+  const proxyUrl = ref('')
   let player: MpegtsPlayer | null = null
 
   async function loadMpegts(): Promise<MpegtsStatic | null> {
@@ -33,6 +39,22 @@ export function useLivePlayer() {
 
   async function initPlayer(videoElement: HTMLVideoElement) {
     error.value = ''
+
+    if (needsProxy(store.protocol)) {
+      try {
+        const port = await invoke<number>('start_stream_proxy', {
+          url: store.sourceUrl,
+          protocol: store.protocol,
+        })
+        proxyUrl.value = `http://localhost:${port}/stream.flv`
+      } catch (e) {
+        error.value = String(e)
+        return
+      }
+    }
+
+    const playUrl = needsProxy(store.protocol) ? proxyUrl.value : store.sourceUrl
+
     const mpegts = await loadMpegts()
     if (!mpegts) return
 
@@ -41,17 +63,17 @@ export function useLivePlayer() {
       return
     }
 
-    destroy()
+    destroyMpegts()
 
     const mpegtsType = PROTOCOL_TO_MPEGTS_TYPE[store.protocol] || 'flv'
-    const isLiveStream = store.isLive || ['rtmp', 'rtsp'].includes(store.protocol)
+    const isLiveStream = true
 
     try {
       player = mpegts.createPlayer({
         type: mpegtsType,
-        url: store.sourceUrl,
+        url: playUrl,
         isLive: isLiveStream,
-        enableStashBuffer: !isLiveStream,
+        enableStashBuffer: false,
       })
 
       player.attachMediaElement(videoElement)
@@ -87,7 +109,7 @@ export function useLivePlayer() {
     }
   }
 
-  function destroy() {
+  function destroyMpegts() {
     if (player) {
       try {
         player.pause()
@@ -101,12 +123,22 @@ export function useLivePlayer() {
     }
   }
 
+  async function destroy() {
+    destroyMpegts()
+    try {
+      await invoke('stop_stream_proxy')
+    } catch {
+      // ignore
+    }
+  }
+
   onUnmounted(() => {
     destroy()
   })
 
   return {
     error,
+    proxyUrl,
     initPlayer,
     play,
     pause,

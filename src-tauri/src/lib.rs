@@ -1,4 +1,5 @@
 pub mod commands;
+pub mod stream;
 
 pub fn run() {
     tauri::Builder::default()
@@ -13,6 +14,8 @@ pub fn run() {
             commands::timestamp::convert_timestamp,
             commands::diff::compute_diff,
             commands::flv::read_local_file,
+            commands::live::start_stream_proxy,
+            commands::live::stop_stream_proxy,
             commands::fileshare::start_file_share,
             commands::fileshare::stop_file_share,
             commands::fileshare::get_local_ip,

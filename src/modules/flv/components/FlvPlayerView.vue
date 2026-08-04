@@ -35,7 +35,12 @@
         class="video-element"
         @timeupdate="onTimeUpdate"
         @loadedmetadata="onLoadedMetadata"
+        @playing="loading = false"
       />
+      <div v-if="loading" class="player-loading">
+        <span class="spinner" />
+        <span class="player-loading__text">Connecting...</span>
+      </div>
     </div>
 
     <div class="live-view__controls">
@@ -87,7 +92,7 @@
         <span class="info-value">{{ store.protocol.toUpperCase() }}</span>
       </div>
       <div class="info-item">
-        <span class="info-label">URL:</span>
+        <span class="info-label">Source:</span>
         <span class="info-value">{{ store.sourceUrl || 'N/A' }}</span>
       </div>
     </div>
@@ -105,6 +110,7 @@ const { error, initPlayer, play, pause, destroy } = useLivePlayer()
 const videoRef = ref<HTMLVideoElement>()
 const protocolSelectRef = ref<HTMLDivElement>()
 const showProtocolDropdown = ref(false)
+const loading = ref(false)
 
 const protocols: { value: StreamProtocol; label: string }[] = [
   { value: 'flv', label: 'FLV (HTTP/WS)' },
@@ -145,13 +151,15 @@ onUnmounted(() => {
 })
 
 async function loadStream() {
-  if (!store.sourceUrl || !videoRef.value) return
-  if (store.sourceUrl.startsWith('rtmp://') || store.sourceUrl.startsWith('rtsp://')) {
-    error.value = `${store.protocol.toUpperCase()} protocol cannot be played directly in browser. Use a media server (SRS/MediaMTX) to convert to HTTP-FLV, then enter the HTTP-FLV URL with FLV protocol.`
-    return
-  }
+  if (!store.sourceUrl || !videoRef.value || loading.value) return
+  loading.value = true
+  error.value = ''
   await initPlayer(videoRef.value)
-  play()
+  if (!error.value) {
+    play()
+  } else {
+    loading.value = false
+  }
 }
 
 function togglePlay() {
@@ -313,6 +321,27 @@ function formatTime(seconds: number): string {
   border-color: var(--color-border-hover);
 }
 
+.action-btn--loading {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--color-text-tertiary);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .live-view__player {
   flex: 1;
   display: flex;
@@ -320,6 +349,24 @@ function formatTime(seconds: number): string {
   justify-content: center;
   background: #000;
   overflow: hidden;
+  position: relative;
+}
+
+.player-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 1;
+}
+
+.player-loading__text {
+  font-size: 14px;
+  color: #fff;
 }
 
 .video-element {

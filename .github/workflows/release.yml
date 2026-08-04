@@ -34,6 +34,32 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
+      - name: Download ffmpeg (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          $url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
+          $zip = "$env:TEMP\ffmpeg.zip"
+          Invoke-WebRequest -Uri $url -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath "$env:TEMP\ffmpeg" -Force
+          $dir = Get-ChildItem "$env:TEMP\ffmpeg" -Directory | Select-Object -First 1
+          New-Item -ItemType Directory -Path "src-tauri/resources" -Force
+          Copy-Item "$($dir.FullName)\bin\ffmpeg.exe" "src-tauri/resources/"
+
+      - name: Download ffmpeg (macOS)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          brew install ffmpeg
+          mkdir -p src-tauri/resources
+          cp $(which ffmpeg) src-tauri/resources/ffmpeg
+
+      - name: Download ffmpeg (Linux)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get install -y ffmpeg
+          mkdir -p src-tauri/resources
+          cp $(which ffmpeg) src-tauri/resources/ffmpeg
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
