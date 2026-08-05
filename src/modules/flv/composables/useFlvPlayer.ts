@@ -2,6 +2,7 @@ import { ref, onUnmounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useLiveStore, type StreamProtocol } from '../store'
 import type { MpegtsPlayer, MpegtsStatic } from '@/lib/mpegts.js/index.d.ts'
+import mpegtsUrl from '@/lib/mpegts.js/mpegts.min.js?url'
 
 const PROTOCOL_TO_MPEGTS_TYPE: Record<StreamProtocol, string> = {
   'flv': 'flv',
@@ -29,7 +30,7 @@ export function useLivePlayer() {
           return
         }
         const script = document.createElement('script')
-        script.src = new URL('@/lib/mpegts.js/mpegts.min.js', import.meta.url).href
+        script.src = mpegtsUrl
         script.onload = () => resolve()
         script.onerror = () => reject(new Error('Failed to load mpegts.js'))
         document.head.appendChild(script)
