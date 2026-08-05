@@ -92,7 +92,7 @@
                   </div>
                 </div>
                 <div v-if="activeTab === 'software'" class="exif-group">
-                  <div class="exif-group__title">其他信息</div>
+                  <div class="exif-group__title">元数据</div>
                   <div v-for="f in softwareFields" :key="f.label" class="exif-field">
                     <span class="exif-field__label">{{ f.label }}</span>
                     <span class="exif-field__value">{{ f.value }}</span>
@@ -136,7 +136,7 @@ const tabs = [
   { id: 'gps', label: 'GPS / 位置' },
   { id: 'shooting', label: '拍摄参数' },
   { id: 'time', label: '日期与时间' },
-  { id: 'software', label: '其他信息' },
+  { id: 'software', label: '元数据' },
   { id: 'all', label: '全部数据' },
 ]
 
