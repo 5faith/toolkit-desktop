@@ -79,46 +79,71 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build and release
+      - name: Build
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: Toolkit Desktop ${{ github.ref_name }}
-          releaseBody: |
-            ## Downloads
-
-            ### Windows
-            - **Portable (.exe)**: 便携版，双击直接运行
-            - **Setup (.exe)**: NSIS installer
-            - **MSI (.msi)**: Windows Installer package
-
-            ### macOS
-            - **Apple Silicon (.dmg)**: For M1/M2/M3/M4 Macs
-            - **Intel (.dmg)**: For Intel Macs
-
-            ### Linux
-            - **AppImage (.AppImage)**: Portable, no installation needed
-            - **Debian (.deb)**: For Ubuntu/Debian
-          releaseDraft: true
-          prerelease: false
           args: ${{ matrix.args }}
 
       - name: Create Windows portable zip
         if: matrix.platform == 'windows-latest'
         shell: pwsh
+        run: |
+          $stagingDir = "portable-staging"
+          New-Item -ItemType Directory -Path $stagingDir -Force
+          Copy-Item "src-tauri/target/release/toolkit-desktop.exe" "$stagingDir/"
+          Compress-Archive -Path "$stagingDir/*" -DestinationPath "Toolkit-Desktop-windows-x64-portable.zip"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.platform }}-${{ strategy.job-index }}
+          path: |
+            src-tauri/target/release/bundle/**/*
+            src-tauri/target/release/toolkit-desktop.exe
+            Toolkit-Desktop-windows-x64-portable.zip
+          if-no-files-found: warn
+          retention-days: 1
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List all artifacts
+        run: find artifacts -type f | sort
+
+      - name: Create release and upload assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $version = "${{ github.ref_name }}"
-          $zipName = "Toolkit-Desktop-${version}-windows-x64-portable.zip"
-          $stagingDir = "portable-staging"
-          New-Item -ItemType Directory -Path $stagingDir -Force
+          version="${GITHUB_REF_NAME}"
 
-          Copy-Item "src-tauri/target/release/toolkit-desktop.exe" "$stagingDir/"
+          gh release create "$version" \
+            --title "Toolkit Desktop $version" \
+            --draft \
+            --notes "## Downloads
 
-          Compress-Archive -Path "$stagingDir/*" -DestinationPath $zipName
+          ### Windows
+          - **Portable (.zip)**: 便携版，解压双击运行
+          - **Setup (.exe)**: NSIS installer
+          - **MSI (.msi)**: Windows Installer package
 
-          gh release upload $version $zipName --clobber
-          Write-Host "Uploaded $zipName"
+          ### macOS
+          - **Apple Silicon (.dmg)**: For M1/M2/M3/M4 Macs
+          - **Intel (.dmg)**: For Intel Macs
+
+          ### Linux
+          - **AppImage (.AppImage)**: Portable, no installation needed
+          - **Debian (.deb)**: For Ubuntu/Debian"
+
+          find artifacts -type f \( -name "*.exe" -o -name "*.msi" -o -name "*.dmg" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.zip" -o -name "*.rpm" -o -name "*.app" \) -exec gh release upload "$version" {} --clobber \;
+
+          echo "Release $version created with all assets"
