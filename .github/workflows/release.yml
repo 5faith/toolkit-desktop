@@ -121,11 +121,6 @@ jobs:
 
           Compress-Archive -Path "$stagingDir/*" -DestinationPath $zipName
 
-          $headers = @{
-            "Authorization" = "token $env:GITHUB_TOKEN"
-            "Accept" = "application/vnd.github+json"
-          }
-          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/tags/$version" -Headers $headers
-          $uploadUrl = "https://uploads.github.com/repos/$env:GITHUB_REPOSITORY/releases/$($release.id)/assets?name=$zipName"
-          Invoke-RestMethod -Uri $uploadUrl -Headers $headers -Method Post -ContentType "application/zip" -InFile $zipName
+          $release = curl -s -H "Authorization: token $env:GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/tags/$version" | ConvertFrom-Json
+          curl -s -X POST -H "Authorization: token $env:GITHUB_TOKEN" -H "Content-Type: application/zip" --data-binary "@$zipName" "https://uploads.github.com/repos/$env:GITHUB_REPOSITORY/releases/$($release.id)/assets?name=$zipName"
           Write-Host "Uploaded $zipName to release $version"
