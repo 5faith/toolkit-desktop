@@ -366,6 +366,21 @@ Rust 侧 Tauri Commands 在 `src-tauri/src/commands/` 下：
 
 ---
 
+## 版本升级
+
+发布新版本时需要同步修改以下 4 个文件中的 `version` 字段：
+
+| 文件 | 位置 | 示例 |
+|------|------|------|
+| `package.json` | 第 2 行 `"version"` | `"version": "0.3.0"` |
+| `package-lock.json` | 第 2 行顶层 `"version"` + 第 9 行 `""` 包的 `"version"` (两处) | `"version": "0.3.0"` |
+| `src-tauri/Cargo.toml` | 第 3 行 `version` | `version = "0.3.0"` |
+| `src-tauri/tauri.conf.json` | 第 4 行 `"version"` | `"version": "0.3.0"` |
+
+**注意**：`package-lock.json` 有两处版本号需要修改（顶层和 `""` 包），可用 `npm version` 自动更新前两个文件，但 `Cargo.toml` 和 `tauri.conf.json` 需手动修改。
+
+---
+
 ## 构建与运行
 
 ```bash
