@@ -90,7 +90,7 @@ jobs:
             ## Downloads
 
             ### Windows
-            - **Portable (.zip)**: Portable, extract and run, no installation needed
+            - **Portable (.exe)**: 便携版，双击直接运行
             - **Setup (.exe)**: NSIS installer
             - **MSI (.msi)**: Windows Installer package
 
@@ -103,24 +103,5 @@ jobs:
             - **Debian (.deb)**: For Ubuntu/Debian
           releaseDraft: true
           prerelease: false
+          uploadPlainBinary: ${{ matrix.platform == 'windows-latest' }}
           args: ${{ matrix.args }}
-
-      - name: Create Windows portable zip
-        if: matrix.platform == 'windows-latest'
-        shell: pwsh
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          $version = "${{ github.ref_name }}"
-          $zipName = "Toolkit-Desktop-${version}-windows-x64-portable.zip"
-          $stagingDir = "portable-staging"
-          New-Item -ItemType Directory -Path $stagingDir
-
-          $exePath = "src-tauri/target/release/toolkit-desktop.exe"
-          Copy-Item $exePath "$stagingDir/"
-
-          Compress-Archive -Path "$stagingDir/*" -DestinationPath $zipName
-
-          $release = curl -s -H "Authorization: token $env:GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/tags/$version" | ConvertFrom-Json
-          curl -s -X POST -H "Authorization: token $env:GITHUB_TOKEN" -H "Content-Type: application/zip" --data-binary "@$zipName" "https://uploads.github.com/repos/$env:GITHUB_REPOSITORY/releases/$($release.id)/assets?name=$zipName"
-          Write-Host "Uploaded $zipName to release $version"
