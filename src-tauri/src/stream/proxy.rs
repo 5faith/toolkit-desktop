@@ -139,11 +139,18 @@ fn find_ffmpeg() -> Result<String, String> {
 async fn pull_with_ffmpeg(url: &str, tx: broadcast::Sender<Vec<u8>>) -> Result<(), String> {
     let ffmpeg_path = find_ffmpeg()?;
 
-    let mut child = Command::new(&ffmpeg_path)
-        .args(["-re", "-i", url, "-c", "copy", "-f", "flv", "-"])
+    let mut cmd = Command::new(&ffmpeg_path);
+    cmd.args(["-re", "-i", url, "-c", "copy", "-f", "flv", "-"])
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
+        .stderr(std::process::Stdio::piped());
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+
+    let mut child = cmd.spawn()
         .map_err(|e| format!("Failed to spawn ffmpeg: {}", e))?;
 
     let mut stdout = child.stdout.take().ok_or("Failed to capture ffmpeg stdout")?;
