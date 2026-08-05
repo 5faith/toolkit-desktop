@@ -475,3 +475,34 @@ const mpegts = (window as Record<string, unknown>).mpegts as MpegtsStatic
 ### WSL 环境限制
 
 `cargo check` / `cargo clippy` 在 WSL 上会因缺少 GTK 系统依赖（`pkg-config`, `libgtk-3-dev`, `libglib2.0-dev` 等）而失败。这是环境问题，不是代码问题。CI/CD 在 Windows 上构建不受影响。
+
+---
+
+## CI/CD 已知问题
+
+### Portable ZIP 上传到 Release
+
+`tauri-apps/tauri-action` 和 `softprops/action-gh-release` **不能混用**来操作同一个 Release：
+
+- `tauri-apps/tauri-action` 创建 Release 后，其他 action（如 `softprops/action-gh-release`）会报 `Resource not accessible by integration` 错误
+- `gh release upload` 对 `tauri-apps/tauri-action` 创建的 Release 静默成功但文件未上传
+
+**解决方案**：使用 GitHub REST API 直接上传 Release Asset：
+
+```yaml
+# 获取 Release ID
+RELEASE_ID=$(gh api "repos/${{ github.repository }}/releases/tags/${TAG}" --jq '.id')
+
+# 使用 uploads API 上传
+curl -sL \
+  -X POST \
+  -H "Authorization: token ${GH_TOKEN}" \
+  -H "Content-Type: application/zip" \
+  -T "${ZIP_PATH}" \
+  "https://uploads.github.com/repos/${{ github.repository }}/releases/${RELEASE_ID}/assets?name=${ZIP_NAME}"
+```
+
+### ffmpeg 下载源
+
+`gyan.dev` 服务器不稳定，CI 中会返回 503。已改用 BtbN GitHub 托管构建：
+`https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip`

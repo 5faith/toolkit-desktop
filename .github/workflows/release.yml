@@ -111,10 +111,21 @@ jobs:
 
       - name: Upload portable ZIP to release
         if: matrix.platform == 'windows-latest'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          files: src-tauri/target/release/Toolkit-Desktop-${{ github.ref_name }}-windows-x64-portable.zip
-          fail_on_unmatched_files: true
+        shell: bash
+        run: |
+          TAG="${{ github.ref_name }}"
+          ZIP_NAME="Toolkit-Desktop-${TAG}-windows-x64-portable.zip"
+          ZIP_PATH="src-tauri/target/release/${ZIP_NAME}"
+
+          RELEASE_ID=$(gh api "repos/${{ github.repository }}/releases/tags/${TAG}" --jq '.id')
+          echo "Release ID: ${RELEASE_ID}"
+
+          curl -sL \
+            -X POST \
+            -H "Authorization: token ${GH_TOKEN}" \
+            -H "Content-Type: application/zip" \
+            -H "Accept: application/vnd.github+json" \
+            -T "${ZIP_PATH}" \
+            "https://uploads.github.com/repos/${{ github.repository }}/releases/${RELEASE_ID}/assets?name=${ZIP_NAME}" | jq .
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
