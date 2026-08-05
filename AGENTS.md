@@ -10,7 +10,7 @@
 | Timestamp Tool | 时间戳与日期互转 |
 | WebSocket Debugger | WebSocket 连接、消息收发、协议调试 |
 | Text Diff | 两段文本的差异对比 |
-| FLV Player | FLV 流媒体本地播放器 |
+| Live Player | RTMP/RTSP/FLV 流媒体本地播放器 |
 | Encryption | UUID 生成、MD5 哈希、AES-256 加解密 |
 
 ---
@@ -25,7 +25,7 @@
 | UI 组件 | 自建组件体系（不引入外部 UI 库） |
 | 样式 | UnoCSS + CSS Variables 主题系统 |
 | 路由 | Vue Router (hash 模式) |
-| FLV 播放 | 本地引入 flv.js (dist 文件置于 `src/lib/flv.js/`) |
+| FLV 播放 | 本地引入 mpegts.js (dist 文件置于 `src/lib/mpegts.js/`) |
 
 ---
 
@@ -34,7 +34,7 @@
 ### 1. 本地优先
 - **禁止使用 CDN 或远程依赖**，所有第三方库必须下载到仓库本地
 - npm 包通过 `package.json` 管理，但需确认其本身不依赖运行时联网
-- flv.js 等浏览器库以 dist 产物形式存放于 `src/lib/` 目录
+- mpegts.js 等浏览器库以 dist 产物形式存放于 `src/lib/` 目录
 - Rust 侧依赖通过 Cargo.toml 管理，均为本地编译
 
 ### 2. 模块化架构
@@ -58,7 +58,10 @@ toolkit-desktop/
 │   │   │   ├── formatter.rs      # format_json, format_xml, validate_json, validate_xml
 │   │   │   ├── timestamp.rs      # get_system_timestamp, convert_timestamp
 │   │   │   ├── diff.rs           # compute_diff
-│   │   │   └── flv.rs            # read_local_file
+│   │   │   ├── flv.rs            # read_local_file
+│   │   │   ├── live.rs           # start_stream_proxy, stop_stream_proxy
+│   │   │   ├── exif.rs           # read_exif_metadata
+│   │   │   └── fileshare.rs      # 文件分享相关
 │   │   └── modules/              # Rust 侧工具模块 (占位)
 │   │       ├── mod.rs
 │   │       ├── formatter/mod.rs
@@ -116,8 +119,8 @@ toolkit-desktop/
 │   │       └── global.css        # 全局样式
 │   │
 │   ├── lib/                      # 本地第三方库
-│   │   └── flv.js/
-│   │       ├── flv.min.js        # flv.js 打包产物
+│   │   └── mpegts.js/
+│   │       ├── mpegts.min.js     # mpegts.js UMD 打包产物
 │   │       └── index.d.ts        # TypeScript 类型声明
 │   │
 │   └── modules/                  # 工具模块 (每个模块自包含)
@@ -163,7 +166,7 @@ toolkit-desktop/
 │       │
 │       ├── flv/
 │       │   ├── index.ts
-│       │   ├── meta.ts           # { id: 'flv', name: 'FLV Player', icon: '▶', shortcut: 'Ctrl+5' }
+│       │   ├── meta.ts           # { id: 'live', name: 'Live Player', icon: '📡', shortcut: 'Ctrl+5' }
 │       │   ├── store.ts
 │       │   ├── components/
 │       │   │   └── FlvPlayerView.vue
@@ -310,6 +313,7 @@ Rust 侧 Tauri Commands 在 `src-tauri/src/commands/` 下：
 | timestamp | `get_system_timestamp`, `convert_timestamp` | `commands/timestamp.rs` |
 | diff | `compute_diff` | `commands/diff.rs` |
 | flv | `read_local_file` | `commands/flv.rs` |
+| live | `start_stream_proxy`, `stop_stream_proxy` | `commands/live.rs` |
 
 所有 Commands 在 `src-tauri/src/lib.rs` 中统一注册。
 
@@ -410,6 +414,29 @@ In repositories indexed by CodeGraph (a `.codegraph/` directory exists at the re
 - **Shell** (always works): `codegraph explore "<symbol names or question>"` prints the same output.
 
 If there is no `.codegraph/` directory, skip CodeGraph entirely — indexing is the user's decision.
+
+---
+
+## 前端侧已知问题
+
+### mpegts.js UMD 加载方式
+
+`src/lib/mpegts.js/mpegts.min.js` 是 UMD 格式库，**不能**通过 Vite 的 `import()` 动态导入。
+
+**原因**：Vite 在构建时会将 `import()` 包装为 ES module 的 namespace 对象，导致 UMD IIFE 中 `window` 全局对象引用被遮蔽，`window.mpegts` 永远不会被设置，运行时报错 `"mpegts.js loaded but not found on window"`。
+
+**正确做法**：通过 `<script>` 标签加载 UMD 库，确保 IIFE 直接执行到 `window.mpegts`：
+
+```ts
+await new Promise<void>((resolve, reject) => {
+  const script = document.createElement('script')
+  script.src = new URL('@/lib/mpegts.js/mpegts.min.js', import.meta.url).href
+  script.onload = () => resolve()
+  script.onerror = () => reject(new Error('Failed to load mpegts.js'))
+  document.head.appendChild(script)
+})
+const mpegts = (window as Record<string, unknown>).mpegts as MpegtsStatic
+```
 
 ---
 

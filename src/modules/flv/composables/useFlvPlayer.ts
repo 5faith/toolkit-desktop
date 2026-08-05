@@ -23,13 +23,23 @@ export function useLivePlayer() {
   async function loadMpegts(): Promise<MpegtsStatic | null> {
     if (mpegtsRef.value) return mpegtsRef.value
     try {
-      await import('@/lib/mpegts.js/mpegts.min.js')
+      await new Promise<void>((resolve, reject) => {
+        if ((window as unknown as Record<string, unknown>).mpegts) {
+          resolve()
+          return
+        }
+        const script = document.createElement('script')
+        script.src = new URL('@/lib/mpegts.js/mpegts.min.js', import.meta.url).href
+        script.onload = () => resolve()
+        script.onerror = () => reject(new Error('Failed to load mpegts.js'))
+        document.head.appendChild(script)
+      })
       const g = window as unknown as Record<string, unknown>
-      mpegtsRef.value = (g.mpegts || g.default) as MpegtsStatic
-      if (!mpegtsRef.value) {
+      if (!g.mpegts) {
         error.value = 'mpegts.js loaded but not found on window'
         return null
       }
+      mpegtsRef.value = g.mpegts as MpegtsStatic
       return mpegtsRef.value
     } catch (e) {
       error.value = `Failed to load mpegts.js: ${e}`
