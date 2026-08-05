@@ -111,19 +111,10 @@ jobs:
 
       - name: Upload portable ZIP to release
         if: matrix.platform == 'windows-latest'
-        shell: pwsh
-        run: |
-          $version = "${{ github.ref_name }}"
-          $zipName = "Toolkit-Desktop-${version}-windows-x64-portable.zip"
-          $zipPath = "src-tauri/target/release/$zipName"
-
-          if (Test-Path $zipPath) {
-            # 使用 gh cli 上传
-            gh release upload $version $zipPath --clobber
-            Write-Host "✅ Uploaded $zipName"
-          } else {
-            Write-Error "❌ Zip not found at $zipPath"
-            exit 1
-          }
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: src-tauri/target/release/Toolkit-Desktop-${{ github.ref_name }}-windows-x64-portable.zip
+          fail_on_unmatched_files: true
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
