@@ -109,7 +109,7 @@ jobs:
         if: matrix.platform == 'windows-latest'
         shell: pwsh
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $version = "${{ github.ref_name }}"
           $zipName = "Toolkit-Desktop-${version}-windows-x64-portable.zip"
@@ -120,4 +120,12 @@ jobs:
           Copy-Item $exePath "$stagingDir/"
 
           Compress-Archive -Path "$stagingDir/*" -DestinationPath $zipName
-          gh release upload "${{ github.ref_name }}" $zipName --clobber
+
+          $headers = @{
+            "Authorization" = "token $env:GITHUB_TOKEN"
+            "Accept" = "application/vnd.github+json"
+          }
+          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/tags/$version" -Headers $headers
+          $uploadUrl = "https://uploads.github.com/repos/$env:GITHUB_REPOSITORY/releases/$($release.id)/assets?name=$zipName"
+          Invoke-RestMethod -Uri $uploadUrl -Headers $headers -Method Post -ContentType "application/zip" -InFile $zipName
+          Write-Host "Uploaded $zipName to release $version"
