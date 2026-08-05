@@ -146,7 +146,6 @@ async fn pull_with_ffmpeg(url: &str, tx: broadcast::Sender<Vec<u8>>) -> Result<(
 
     #[cfg(target_os = "windows")]
     {
-        use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x08000000);
     }
 
