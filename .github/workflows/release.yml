@@ -115,7 +115,7 @@ jobs:
           $version = "${{ github.ref_name }}"
           $zipName = "Toolkit-Desktop-${version}-windows-x64-portable.zip"
 
-          $exePath = "src-tauri/target/release/Toolkit Desktop.exe"
+          $exePath = "src-tauri/target/release/toolkit-desktop.exe"
           if (-not (Test-Path $exePath)) {
             Write-Error "Executable not found at: $exePath"
             exit 1
