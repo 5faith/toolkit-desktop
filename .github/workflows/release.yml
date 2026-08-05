@@ -100,7 +100,7 @@ jobs:
           $sourceDir = "src-tauri/target/release"
           $zipPath = Join-Path $sourceDir $zipName
 
-          Compress-Archive -Path "$sourceDir/toolkit-desktop.exe", "$sourceDir/resources" -DestinationPath $zipPath -Force
+          Compress-Archive -Path "$sourceDir/toolkit-desktop.exe" -DestinationPath $zipPath -Force
 
           if (Test-Path $zipPath) {
             Write-Host "Created $zipName"
