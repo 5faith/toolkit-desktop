@@ -90,7 +90,7 @@ jobs:
             ## Downloads
 
             ### Windows
-            - **Portable (.zip)**: Portable, extract and run, no installation needed
+            - **Portable (.exe)**: Portable, no installation needed
             - **Setup (.exe)**: NSIS installer
             - **MSI (.msi)**: Windows Installer package
 
@@ -103,21 +103,5 @@ jobs:
             - **Debian (.deb)**: For Ubuntu/Debian
           releaseDraft: true
           prerelease: false
+          uploadPlainBinary: ${{ matrix.platform == 'windows-latest' }}
           args: ${{ matrix.args }}
-
-      - name: Create Windows portable zip
-        if: matrix.platform == 'windows-latest'
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          $version = "${{ github.ref_name }}"
-          $zipName = "Toolkit-Desktop-${version}-windows-x64-portable.zip"
-          $stagingDir = "portable-staging"
-          New-Item -ItemType Directory -Path $stagingDir
-
-          $exePath = "src-tauri/target/release/toolkit-desktop.exe"
-          Copy-Item $exePath "$stagingDir/"
-
-          Compress-Archive -Path "$stagingDir/*" -DestinationPath $zipName
-          gh release upload "${{ github.ref_name }}" $zipName --clobber
