@@ -60,9 +60,6 @@ export function useExif() {
       store.setImage(path, name, size, src)
 
       const data = await invoke<ExifData>('read_image_exif', { path })
-      console.log('[useExif] received data:', data)
-      console.log('[useExif] allFields:', data.allFields)
-      console.log('[useExif] allFields length:', data.allFields?.length)
       store.setExifData(data)
     } catch (e) {
       store.setError(String(e))

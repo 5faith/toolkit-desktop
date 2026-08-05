@@ -175,12 +175,8 @@ const timeFields = computed<ExifField[]>(() => filterByTags(timeTags))
 const softwareFields = computed<ExifField[]>(() => filterByTags(softwareTags))
 
 const allFields = computed<ExifField[]>(() => {
-  const d = store.exifData
-  console.log('[ExifView] allFields computed, exifData:', d)
-  console.log('[ExifView] allFields raw:', d?.allFields)
-  console.log('[ExifView] allFields length:', d?.allFields?.length)
-  if (!d?.allFields) return []
-  return d.allFields.map(f => ({ label: f.tag, value: f.value }))
+  if (!store.exifData?.allFields) return []
+  return store.exifData.allFields.map(f => ({ label: f.tag, value: f.value }))
 })
 
 function filterByTags(tags: Set<string>): ExifField[] {

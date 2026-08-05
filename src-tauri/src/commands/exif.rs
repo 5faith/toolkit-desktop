@@ -5,12 +5,14 @@ use std::io::BufReader;
 use std::path::Path;
 
 #[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct ExifField {
     pub tag: String,
     pub value: String,
 }
 
 #[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct ExifData {
     pub camera_make: Option<String>,
     pub camera_model: Option<String>,
