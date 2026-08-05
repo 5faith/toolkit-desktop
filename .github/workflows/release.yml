@@ -89,9 +89,13 @@ jobs:
       - name: Create Windows Portable ZIP
         if: matrix.platform == 'windows-latest'
         shell: pwsh
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
         run: |
+          $version = $env:GITHUB_REF_NAME
+          $zipName = "Toolkit-Desktop-${version}-windows-x64-portable.zip"
           cd src-tauri/target/release
-          Compress-Archive -Path "*.exe", "resources" -DestinationPath portable.zip
+          Compress-Archive -Path "*.exe", "resources" -DestinationPath $zipName
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -104,7 +108,7 @@ jobs:
             src-tauri/target/release/bundle/**/*.AppImage
             src-tauri/target/release/bundle/**/*.deb
             src-tauri/target/release/bundle/**/*.rpm
-            src-tauri/target/release/portable.zip
+            src-tauri/target/release/Toolkit-Desktop-*-windows-x64-portable.zip
           if-no-files-found: warn
           retention-days: 1
 
