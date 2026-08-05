@@ -98,7 +98,7 @@ jobs:
           Compress-Archive -Path "*.exe", "resources" -DestinationPath $zipName
 
       - name: Upload bundle
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v7
         with:
           name: bundle-${{ matrix.platform }}-${{ strategy.job-index }}
           path: |
@@ -109,7 +109,7 @@ jobs:
 
       - name: Upload portable zip
         if: matrix.platform == 'windows-latest'
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v7
         with:
           name: portable-zip
           path: src-tauri/target/release/Toolkit-Desktop-*-windows-x64-portable.zip
@@ -124,7 +124,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4.6.2
+        uses: actions/download-artifact@v7
         with:
           path: artifacts
           merge-multiple: true
