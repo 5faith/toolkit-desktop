@@ -98,9 +98,17 @@ jobs:
           $version = "${{ github.ref_name }}"
           $zipName = "Toolkit-Desktop-${version}-windows-x64-portable.zip"
           $sourceDir = "src-tauri/target/release"
+          $staging = "$sourceDir/portable-staging"
           $zipPath = Join-Path $sourceDir $zipName
 
-          Compress-Archive -Path "$sourceDir/toolkit-desktop.exe" -DestinationPath $zipPath -Force
+          if (Test-Path $staging) { Remove-Item $staging -Recurse -Force }
+          New-Item -ItemType Directory -Path $staging -Force | Out-Null
+          Copy-Item "$sourceDir/toolkit-desktop.exe" "$staging/"
+          if (Test-Path "src-tauri/resources") {
+            Copy-Item "src-tauri/resources" "$staging/resources" -Recurse
+          }
+          Compress-Archive -Path "$staging/*" -DestinationPath $zipPath -Force
+          Remove-Item $staging -Recurse -Force
 
           if (Test-Path $zipPath) {
             Write-Host "Created $zipName"

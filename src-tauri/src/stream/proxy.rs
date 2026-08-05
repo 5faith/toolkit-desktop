@@ -92,9 +92,14 @@ fn find_ffmpeg() -> Result<String, String> {
 
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
-            let bundled = dir.join(ffmpeg_name);
+            let bundled = dir.join("resources").join(ffmpeg_name);
             if bundled.exists() {
                 return Ok(bundled.to_string_lossy().into_owned());
+            }
+
+            let portable = dir.join(ffmpeg_name);
+            if portable.exists() {
+                return Ok(portable.to_string_lossy().into_owned());
             }
         }
     }
@@ -103,21 +108,6 @@ fn find_ffmpeg() -> Result<String, String> {
         let res = std::path::PathBuf::from(cargo_dir).join("resources").join(ffmpeg_name);
         if res.exists() {
             return Ok(res.to_string_lossy().into_owned());
-        }
-    }
-
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            for depth in &[3, 4, 5] {
-                let mut p = dir.to_path_buf();
-                for _ in 0..*depth {
-                    p.pop();
-                }
-                let candidate = p.join("src-tauri").join("resources").join(ffmpeg_name);
-                if candidate.exists() {
-                    return Ok(candidate.to_string_lossy().into_owned());
-                }
-            }
         }
     }
 
