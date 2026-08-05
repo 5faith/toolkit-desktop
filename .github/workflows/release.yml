@@ -112,12 +112,19 @@ jobs:
       - name: Upload portable ZIP to release
         if: matrix.platform == 'windows-latest'
         timeout-minutes: 10
-        shell: bash
+        shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="${{ github.ref_name }}"
-          ZIP_NAME="Toolkit-Desktop-${TAG}-windows-x64-portable.zip"
-          ZIP_PATH="src-tauri/target/release/${ZIP_NAME}"
+          $version = "${{ github.ref_name }}"
+          $zipName = "Toolkit-Desktop-${version}-windows-x64-portable.zip"
+          $zipPath = "src-tauri/target/release/$zipName"
 
-          gh release upload "${TAG}" "${ZIP_PATH}" --repo "${{ github.repository }}" --clobber
+          if (!(Test-Path $zipPath)) {
+            Write-Error "ZIP not found: $zipPath"
+            exit 1
+          }
+
+          Write-Host "Uploading $zipName..."
+          gh release upload $version $zipPath --repo "${{ github.repository }}" --clobber
+          Write-Host "Exit code: $LASTEXITCODE"
