@@ -10,32 +10,12 @@ permissions:
 
 jobs:
   build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: windows-latest
-            args: ''
-          - platform: macos-latest
-            args: '--target aarch64-apple-darwin'
-          - platform: macos-latest
-            args: '--target x86_64-apple-darwin'
-          - platform: ubuntu-22.04
-            args: ''
-
-    runs-on: ${{ matrix.platform }}
+    runs-on: windows-latest
 
     steps:
       - uses: actions/checkout@v7
 
-      - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-
-      - name: Download ffmpeg (Windows)
-        if: matrix.platform == 'windows-latest'
+      - name: Download ffmpeg
         shell: pwsh
         run: |
           $url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
@@ -46,21 +26,6 @@ jobs:
           New-Item -ItemType Directory -Path "src-tauri/resources" -Force
           Copy-Item "$($dir.FullName)\bin\ffmpeg.exe" "src-tauri/resources/"
 
-      - name: Download ffmpeg (macOS)
-        if: matrix.platform == 'macos-latest'
-        run: |
-          brew trust aws/tap
-          brew install ffmpeg
-          mkdir -p src-tauri/resources
-          cp $(which ffmpeg) src-tauri/resources/ffmpeg
-
-      - name: Download ffmpeg (Linux)
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get install -y ffmpeg
-          mkdir -p src-tauri/resources
-          cp $(which ffmpeg) src-tauri/resources/ffmpeg
-
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
@@ -68,8 +33,6 @@ jobs:
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -84,66 +47,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: ${{ matrix.args }}
+          args: ''
 
-      - name: Create Windows portable zip
-        if: matrix.platform == 'windows-latest'
+      - name: Create Windows Portable ZIP
         shell: pwsh
         run: |
-          $stagingDir = "portable-staging"
-          New-Item -ItemType Directory -Path $stagingDir -Force
-          Copy-Item "src-tauri/target/release/toolkit-desktop.exe" "$stagingDir/"
-          Compress-Archive -Path "$stagingDir/*" -DestinationPath "Toolkit-Desktop-windows-x64-portable.zip"
+          cd src-tauri/target/release
+          Compress-Archive -Path "*.exe", "resources" -DestinationPath portable.zip
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-${{ matrix.platform }}-${{ strategy.job-index }}
-          path: |
-            src-tauri/target/release/bundle/**/*
-            src-tauri/target/release/toolkit-desktop.exe
-            Toolkit-Desktop-windows-x64-portable.zip
-          if-no-files-found: warn
-          retention-days: 1
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-          merge-multiple: true
-
-      - name: List all artifacts
-        run: find artifacts -type f | sort
-
-      - name: Create release and upload assets
+      - name: Upload to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           version="${GITHUB_REF_NAME}"
-
           gh release create "$version" \
             --title "Toolkit Desktop $version" \
             --draft \
-            --notes "## Downloads
-
-          ### Windows
-          - **Portable (.zip)**: 便携版，解压双击运行
-          - **Setup (.exe)**: NSIS installer
-          - **MSI (.msi)**: Windows Installer package
-
-          ### macOS
-          - **Apple Silicon (.dmg)**: For M1/M2/M3/M4 Macs
-          - **Intel (.dmg)**: For Intel Macs
-
-          ### Linux
-          - **AppImage (.AppImage)**: Portable, no installation needed
-          - **Debian (.deb)**: For Ubuntu/Debian"
-
-          find artifacts -type f \( -name "*.exe" -o -name "*.msi" -o -name "*.dmg" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.zip" -o -name "*.rpm" -o -name "*.app" \) -exec gh release upload "$version" {} --clobber \;
-
-          echo "Release $version created with all assets"
+            --notes "Toolkit Desktop $version" \
+            "src-tauri/target/release/portable.zip#Toolkit-Desktop-${version}-windows-x64-portable.zip"
