@@ -107,18 +107,18 @@ jobs:
 
       - name: Create Windows portable zip
         if: matrix.platform == 'windows-latest'
-        shell: bash
+        shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          version="${GITHUB_REF_NAME}"
-          zipName="Toolkit-Desktop-${version}-windows-x64-portable.zip"
-          stagingDir="portable-staging"
-          mkdir -p "$stagingDir"
+          $version = "${{ github.ref_name }}"
+          $zipName = "Toolkit-Desktop-${version}-windows-x64-portable.zip"
+          $stagingDir = "portable-staging"
+          New-Item -ItemType Directory -Path $stagingDir -Force
 
-          cp "src-tauri/target/release/toolkit-desktop.exe" "$stagingDir/"
+          Copy-Item "src-tauri/target/release/toolkit-desktop.exe" "$stagingDir/"
 
-          zip -j "$zipName" "$stagingDir"/*
+          Compress-Archive -Path "$stagingDir/*" -DestinationPath $zipName
 
-          gh release upload "$version" "$zipName" --clobber
-          echo "Uploaded $zipName"
+          gh release upload $version $zipName --clobber
+          Write-Host "Uploaded $zipName"
