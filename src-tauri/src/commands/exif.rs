@@ -71,6 +71,53 @@ fn get_display(exif: &exif::Exif, tag: Tag) -> Option<String> {
         .map(|f| f.display_value().to_string())
 }
 
+fn clean_tag_name(raw: &str) -> String {
+    if raw.starts_with("Tag(") && raw.ends_with(')') {
+        let inner = &raw[4..raw.len() - 1];
+        let parts: Vec<&str> = inner.splitn(2, ", ").collect();
+        if parts.len() == 2 {
+            return format!("{} #{}", parts[0], parts[1]);
+        }
+    }
+    raw.to_string()
+}
+
+fn decode_value(raw: &str) -> String {
+    let trimmed = raw.trim();
+    if !trimmed.contains(',') {
+        return trimmed.to_string();
+    }
+    let parts: Vec<&str> = trimmed.split(',').collect();
+    if parts.len() < 4 {
+        return trimmed.to_string();
+    }
+    let bytes: Option<Vec<u8>> = parts
+        .iter()
+        .map(|s| s.trim().parse::<u8>().ok())
+        .collect();
+    if let Some(b) = bytes {
+        if b.len() >= 4 && b.iter().all(|&x| x == 0 || x.is_ascii_graphic() || x == b' ') {
+            let utf16: Vec<u16> = b
+                .chunks(2)
+                .filter_map(|c| {
+                    if c.len() == 2 {
+                        Some(u16::from_le_bytes([c[0], c[1]]))
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            if let Ok(s) = String::from_utf16(&utf16) {
+                let cleaned: String = s.chars().filter(|c| !c.is_control() || *c == '\n').collect();
+                if !cleaned.is_empty() {
+                    return cleaned;
+                }
+            }
+        }
+    }
+    trimmed.to_string()
+}
+
 fn get_u32(exif: &exif::Exif, tag: Tag) -> Option<u32> {
     exif.get_field(tag, exif::In::PRIMARY)
         .and_then(|f| f.value.get_uint(0))
@@ -136,8 +183,9 @@ pub fn read_image_exif(path: &str) -> Result<ExifData, String> {
     let mut total: u32 = 0;
     for field in exif.fields() {
         total += 1;
-        let tag_name = field.tag.to_string();
-        let val = field.display_value().to_string();
+        let tag_name = clean_tag_name(&field.tag.to_string());
+        let raw = field.display_value().to_string();
+        let val = decode_value(&raw);
         all_fields.push(ExifField {
             tag: tag_name,
             value: val,
