@@ -16,6 +16,7 @@
     "@tauri-apps/plugin-store": "^2.4.4",
     "diff": "^7.0.0",
     "pinia": "^2.2.0",
+    "tauri-plugin-mpv-api": "^0.5.2",
     "vue": "^3.5.0",
     "vue-router": "^4.4.0"
   },

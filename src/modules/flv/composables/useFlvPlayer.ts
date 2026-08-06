@@ -1,158 +1,137 @@
 import { ref, onUnmounted } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
-import { useLiveStore, type StreamProtocol } from '../store'
-import type { MpegtsPlayer, MpegtsStatic } from '@/lib/mpegts.js/index.d.ts'
-import mpegtsUrl from '@/lib/mpegts.js/mpegts.min.js?url'
+import { useLiveStore } from '../store'
 
-const PROTOCOL_TO_MPEGTS_TYPE: Record<StreamProtocol, string> = {
-  'flv': 'flv',
-  'rtmp': 'flv',
-  'rtsp': 'flv',
+let mpvApi: typeof import('tauri-plugin-mpv-api') | null = null
+
+async function loadMpvApi() {
+  if (mpvApi) return mpvApi
+  mpvApi = await import('tauri-plugin-mpv-api')
+  return mpvApi
 }
 
-function needsProxy(protocol: StreamProtocol): boolean {
-  return protocol === 'rtmp' || protocol === 'rtsp'
-}
+const OBSERVED_PROPERTIES = ['pause', 'time-pos', 'duration', 'filename', 'volume', 'eof-reached'] as const
+
+export type PlayerState = 'no-mpv' | 'idle' | 'connecting' | 'playing'
 
 export function useLivePlayer() {
   const store = useLiveStore()
   const error = ref('')
-  const mpegtsRef = ref<MpegtsStatic | null>(null)
-  const proxyUrl = ref('')
-  let player: MpegtsPlayer | null = null
+  const state = ref<PlayerState>('idle')
+  let unlisten: (() => void) | null = null
 
-  async function loadMpegts(): Promise<MpegtsStatic | null> {
-    if (mpegtsRef.value) return mpegtsRef.value
+  async function checkMpv(): Promise<boolean> {
     try {
-      await new Promise<void>((resolve, reject) => {
-        if ((window as unknown as Record<string, unknown>).mpegts) {
-          resolve()
-          return
+      const api = await loadMpvApi()
+      await api.init({
+        args: ['--hwdec=auto-safe', '--keep-open=yes'],
+        observedProperties: [...OBSERVED_PROPERTIES],
+        showMpvOutput: true,
+      })
+      unlisten = await api.observeProperties(OBSERVED_PROPERTIES, ({ name, data }) => {
+        switch (name) {
+          case 'pause':
+            store.setPlaying(!data)
+            break
+          case 'time-pos':
+            if (data != null) {
+              store.setCurrentTime(data as number)
+              if (state.value === 'connecting') {
+                state.value = 'playing'
+              }
+            }
+            break
+          case 'duration':
+            if (data != null) store.setDuration(data as number)
+            break
+          case 'volume':
+            store.setVolume(data / 100)
+            break
+          case 'eof-reached':
+            if (data === true) store.setPlaying(false)
+            break
         }
-        const script = document.createElement('script')
-        script.src = mpegtsUrl
-        script.onload = () => resolve()
-        script.onerror = () => reject(new Error('Failed to load mpegts.js'))
-        document.head.appendChild(script)
       })
-      const g = window as unknown as Record<string, unknown>
-      if (!g.mpegts) {
-        error.value = 'mpegts.js loaded but not found on window'
-        return null
-      }
-      mpegtsRef.value = g.mpegts as MpegtsStatic
-      return mpegtsRef.value
-    } catch (e) {
-      error.value = `Failed to load mpegts.js: ${e}`
-      return null
+      state.value = 'idle'
+      return true
+    } catch {
+      state.value = 'no-mpv'
+      return false
     }
   }
 
-  async function initPlayer(videoElement: HTMLVideoElement) {
+  async function loadStream(url: string) {
     error.value = ''
-
-    if (needsProxy(store.protocol)) {
-      try {
-        const port = await invoke<number>('start_stream_proxy', {
-          url: store.sourceUrl,
-          protocol: store.protocol,
-        })
-        proxyUrl.value = `http://localhost:${port}/stream.flv`
-      } catch (e) {
-        error.value = String(e)
-        return
-      }
-    }
-
-    const playUrl = needsProxy(store.protocol) ? proxyUrl.value : store.sourceUrl
-
-    const mpegts = await loadMpegts()
-    if (!mpegts) return
-
-    if (!mpegts.isSupported()) {
-      error.value = 'MSE playback is not supported in this environment'
-      return
-    }
-
-    destroyMpegts()
-
-    const mpegtsType = PROTOCOL_TO_MPEGTS_TYPE[store.protocol] || 'flv'
-    const isLiveStream = true
-
+    state.value = 'connecting'
     try {
-      player = mpegts.createPlayer({
-        type: mpegtsType,
-        url: playUrl,
-        isLive: isLiveStream,
-        enableStashBuffer: false,
-      })
-
-      player.attachMediaElement(videoElement)
-      player.load()
-
-      player.on('error', (...args: unknown[]) => {
-        const errObj = args[1] as { msg?: string } | undefined
-        error.value = errObj?.msg || String(args[0])
-      })
-
-      player.on('loading_complete', () => {
-        store.setPlaying(false)
-      })
+      const api = await loadMpvApi()
+      await api.command('loadfile', [url])
+      await api.setProperty('volume', Math.round(store.volume * 100))
+      const paused = await api.getProperty('pause')
+      store.setPlaying(!paused)
     } catch (e) {
-      error.value = String(e)
+      error.value = `Failed to play: ${e}`
+      state.value = 'idle'
     }
   }
 
-  async function play() {
-    if (!player) return
+  async function togglePlay() {
     try {
-      await player.play()
-      store.setPlaying(true)
+      const api = await loadMpvApi()
+      const paused = await api.getProperty('pause')
+      const newPaused = !paused
+      await api.setProperty('pause', newPaused)
+      store.setPlaying(!newPaused)
     } catch (e) {
-      error.value = String(e)
+      error.value = `Failed to toggle play: ${e}`
     }
   }
 
-  function pause() {
-    if (player) {
-      player.pause()
+  async function stop() {
+    try {
+      const api = await loadMpvApi()
+      await api.command('stop')
       store.setPlaying(false)
+      store.setCurrentTime(0)
+      store.setDuration(0)
+      state.value = 'idle'
+    } catch (e) {
+      error.value = `Failed to stop: ${e}`
     }
   }
 
-  function destroyMpegts() {
-    if (player) {
-      try {
-        player.pause()
-        player.detachMediaElement()
-        player.destroy()
-      } catch {
-        // ignore cleanup errors
-      }
-      player = null
-      store.setPlaying(false)
+  async function setVolume(v: number) {
+    try {
+      const api = await loadMpvApi()
+      await api.setProperty('volume', Math.round(v * 100))
+    } catch (e) {
+      error.value = `Failed to set volume: ${e}`
+    }
+  }
+
+  async function seek(time: number) {
+    try {
+      const api = await loadMpvApi()
+      await api.command('seek', [String(time), 'absolute'])
+    } catch (e) {
+      error.value = `Failed to seek: ${e}`
     }
   }
 
   async function destroy() {
-    destroyMpegts()
+    if (unlisten) {
+      unlisten()
+      unlisten = null
+    }
     try {
-      await invoke('stop_stream_proxy')
+      const api = await loadMpvApi()
+      await api.destroy()
+      state.value = 'idle'
     } catch {
-      // ignore
+      // ignore cleanup errors
     }
   }
 
-  onUnmounted(() => {
-    destroy()
-  })
+  onUnmounted(() => { destroy() })
 
-  return {
-    error,
-    proxyUrl,
-    initPlayer,
-    play,
-    pause,
-    destroy,
-  }
+  return { error, state, checkMpv, loadStream, togglePlay, stop, setVolume, seek, destroy }
 }

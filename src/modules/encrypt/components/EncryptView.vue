@@ -130,6 +130,7 @@ async function handleAesDecrypt() {
   display: flex;
   flex-direction: column;
   height: 100%;
+  background: var(--color-bg-secondary);
 }
 
 .encrypt-view__toolbar {

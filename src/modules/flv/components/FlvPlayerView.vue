@@ -1,6 +1,6 @@
 <template>
   <div class="live-view">
-    <div class="live-view__toolbar">
+    <div class="live-view__toolbar" :class="{ 'live-view__toolbar--disabled': state === 'no-mpv' }">
       <div ref="protocolSelectRef" class="protocol-select" @click.stop="showProtocolDropdown = !showProtocolDropdown">
         <span class="protocol-select__label">{{ protocolLabel }}</span>
         <span class="protocol-select__arrow">▾</span>
@@ -20,26 +20,45 @@
         v-model="store.sourceUrl"
         class="url-input"
         :placeholder="urlPlaceholder"
-        @keydown.enter="loadStream"
+        :disabled="state === 'no-mpv' || state === 'connecting'"
+        @keydown.enter="onLoad"
       />
-      <button class="action-btn" @click="loadStream">Load</button>
-      <button class="action-btn" @click="togglePlay">
+      <button class="action-btn" :disabled="state === 'no-mpv' || state === 'connecting'" @click="onLoad">Load</button>
+      <button class="action-btn" :disabled="state === 'no-mpv'" @click="togglePlay">
         {{ store.playing ? 'Pause' : 'Play' }}
       </button>
-      <button class="action-btn" @click="stopStream">Stop</button>
+      <button class="action-btn" :disabled="state === 'no-mpv'" @click="onStop">Stop</button>
     </div>
 
     <div class="live-view__player">
-      <video
-        ref="videoRef"
-        class="video-element"
-        @timeupdate="onTimeUpdate"
-        @loadedmetadata="onLoadedMetadata"
-        @playing="loading = false"
-      />
-      <div v-if="loading" class="player-loading">
+      <div v-if="state === 'no-mpv'" class="mpv-notice">
+        <div class="mpv-notice__icon">📡</div>
+        <div class="mpv-notice__title">mpv not found</div>
+        <div class="mpv-notice__text">
+          Live Player requires mpv to be installed on your system.
+        </div>
+        <div class="mpv-notice__instructions">
+          <div class="mpv-notice__platform">
+            <strong>Windows:</strong> <code>https://sourceforge.net/projects/mpv-player-windows/files/64bit/</code>
+          </div>
+          <div class="mpv-notice__platform">
+            <strong>macOS:</strong> <code>brew install mpv</code>
+          </div>
+          <div class="mpv-notice__platform">
+            <strong>Linux:</strong> <code>sudo apt install mpv</code>
+          </div>
+        </div>
+        <div class="mpv-notice__tip">Add mpv.exe to your system PATH, then restart the app.</div>
+      </div>
+
+      <div v-else-if="state === 'idle'" class="player-idle">
+        <span class="player-idle__icon">📡</span>
+        <span class="player-idle__text">Enter a URL and click Load to start</span>
+      </div>
+
+      <div v-else-if="state === 'connecting'" class="player-connecting">
         <span class="spinner" />
-        <span class="player-loading__text">Connecting...</span>
+        <span class="player-connecting__text">Connecting...</span>
       </div>
     </div>
 
@@ -85,7 +104,7 @@
     <div class="live-view__info">
       <div class="info-item">
         <span class="info-label">Status:</span>
-        <span class="info-value">{{ store.playing ? 'Playing' : 'Stopped' }}</span>
+        <span class="info-value">{{ store.playing ? 'Playing' : 'Paused' }}</span>
       </div>
       <div class="info-item">
         <span class="info-label">Protocol:</span>
@@ -105,12 +124,10 @@ import { useLiveStore, type StreamProtocol } from '../store'
 import { useLivePlayer } from '../composables/useFlvPlayer'
 
 const store = useLiveStore()
-const { error, initPlayer, play, pause, destroy } = useLivePlayer()
+const { error, state, checkMpv, loadStream, togglePlay, stop, setVolume, seek } = useLivePlayer()
 
-const videoRef = ref<HTMLVideoElement>()
 const protocolSelectRef = ref<HTMLDivElement>()
 const showProtocolDropdown = ref(false)
-const loading = ref(false)
 
 const protocols: { value: StreamProtocol; label: string }[] = [
   { value: 'flv', label: 'FLV (HTTP/WS)' },
@@ -142,67 +159,34 @@ function onDocumentClick(e: MouseEvent) {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   document.addEventListener('click', onDocumentClick)
+  await checkMpv()
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', onDocumentClick)
 })
 
-async function loadStream() {
-  if (!store.sourceUrl || !videoRef.value || loading.value) return
-  loading.value = true
-  error.value = ''
-  await initPlayer(videoRef.value)
-  if (!error.value) {
-    play()
-  } else {
-    loading.value = false
-  }
+function onLoad() {
+  if (!store.sourceUrl) return
+  loadStream(store.sourceUrl)
 }
 
-function togglePlay() {
-  if (store.playing) {
-    pause()
-  } else {
-    play()
-  }
-}
-
-function stopStream() {
-  destroy()
-  if (videoRef.value) {
-    videoRef.value.currentTime = 0
-  }
-}
-
-function onTimeUpdate() {
-  if (videoRef.value) {
-    store.setCurrentTime(videoRef.value.currentTime)
-  }
-}
-
-function onLoadedMetadata() {
-  if (videoRef.value) {
-    store.setDuration(videoRef.value.duration)
-  }
+function onStop() {
+  stop()
 }
 
 function onSeek(event: Event) {
   const target = event.target as HTMLInputElement
-  if (videoRef.value) {
-    videoRef.value.currentTime = Number(target.value)
-  }
+  seek(Number(target.value))
 }
 
 function onVolumeChange(event: Event) {
   const target = event.target as HTMLInputElement
   const vol = Number(target.value)
   store.setVolume(vol)
-  if (videoRef.value) {
-    videoRef.value.volume = vol
-  }
+  setVolume(vol)
 }
 
 function formatTime(seconds: number): string {
@@ -218,8 +202,7 @@ function formatTime(seconds: number): string {
   display: flex;
   flex-direction: column;
   height: 100%;
-  gap: 1px;
-  background: var(--color-border);
+  background: var(--color-bg-primary);
 }
 
 .live-view__toolbar {
@@ -229,6 +212,11 @@ function formatTime(seconds: number): string {
   padding: var(--spacing-sm) var(--spacing-md);
   background: var(--color-bg-primary);
   flex-shrink: 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.live-view__toolbar--disabled {
+  pointer-events: none;
 }
 
 .protocol-select {
@@ -316,13 +304,13 @@ function formatTime(seconds: number): string {
   white-space: nowrap;
 }
 
-.action-btn:hover {
+.action-btn:hover:not(:disabled) {
   background: var(--color-bg-hover);
   border-color: var(--color-border-hover);
 }
 
-.action-btn--loading {
-  opacity: 0.7;
+.action-btn:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
@@ -347,12 +335,12 @@ function formatTime(seconds: number): string {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #000;
+  background: transparent;
   overflow: hidden;
   position: relative;
 }
 
-.player-loading {
+.player-idle {
   position: absolute;
   inset: 0;
   display: flex;
@@ -360,18 +348,33 @@ function formatTime(seconds: number): string {
   align-items: center;
   justify-content: center;
   gap: var(--spacing-sm);
-  background: rgba(0, 0, 0, 0.6);
+  background: #111;
+}
+
+.player-idle__icon {
+  font-size: 36px;
+}
+
+.player-idle__text {
+  font-size: 13px;
+  color: #888;
+}
+
+.player-connecting {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  background: #111;
   z-index: 1;
 }
 
-.player-loading__text {
+.player-connecting__text {
   font-size: 14px;
   color: #fff;
-}
-
-.video-element {
-  max-width: 100%;
-  max-height: 100%;
 }
 
 .live-view__controls {
@@ -381,6 +384,7 @@ function formatTime(seconds: number): string {
   padding: var(--spacing-sm) var(--spacing-md);
   background: var(--color-bg-primary);
   flex-shrink: 0;
+  border-top: 1px solid var(--color-border);
 }
 
 .controls__progress {
@@ -444,6 +448,7 @@ function formatTime(seconds: number): string {
   color: var(--color-error);
   background: var(--color-bg-primary);
   flex-shrink: 0;
+  border-top: 1px solid var(--color-border);
 }
 
 .live-view__info {
@@ -452,6 +457,7 @@ function formatTime(seconds: number): string {
   padding: var(--spacing-sm) var(--spacing-md);
   background: var(--color-bg-primary);
   flex-shrink: 0;
+  border-top: 1px solid var(--color-border);
 }
 
 .info-item {
@@ -467,5 +473,83 @@ function formatTime(seconds: number): string {
 .info-value {
   color: var(--color-text-secondary);
   font-family: var(--font-mono);
+}
+
+.mpv-notice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-lg);
+  text-align: center;
+  color: var(--color-text-secondary);
+  position: absolute;
+  inset: 0;
+  background: #111;
+}
+
+.mpv-notice__icon {
+  font-size: 48px;
+  margin-bottom: var(--spacing-sm);
+}
+
+.mpv-notice__title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.mpv-notice__text {
+  font-size: 14px;
+  max-width: 400px;
+}
+
+.mpv-notice__text a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.mpv-notice__text a:hover {
+  text-decoration: underline;
+}
+
+.mpv-link {
+  color: var(--color-accent);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.mpv-link:hover {
+  text-decoration: underline;
+}
+
+.mpv-notice__instructions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  margin-top: var(--spacing-sm);
+  font-size: 13px;
+}
+
+.mpv-notice__platform {
+  display: flex;
+  gap: var(--spacing-xs);
+  align-items: center;
+}
+
+.mpv-notice__platform code {
+  background: var(--color-bg-hover);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.mpv-notice__tip {
+  margin-top: var(--spacing-sm);
+  font-size: 12px;
+  color: var(--color-text-tertiary);
 }
 </style>

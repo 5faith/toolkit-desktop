@@ -7,29 +7,34 @@ toolkit desktop
 
 - [Node.js](https://nodejs.org/) 18+
 - [Rust](https://www.rust-lang.org/tools/install) (latest stable)
-- [ffmpeg](https://ffmpeg.org/) (required for RTMP/RTSP stream proxy)
+- [mpv](https://mpv.io/) — **使用 Live Player 功能必须安装**
 
-### ffmpeg Setup (Required for RTMP/RTSP)
+### mpv 安装说明
 
-Live Player 的 RTMP/RTSP 功能依赖 ffmpeg 拉流转码。
+Live Player 支持 RTMP、RTSP、HTTP-FLV、HLS 等流媒体协议播放，底层依赖 [mpv](https://mpv.io/)。未安装 mpv 时，Live Player 页面会显示提示。
 
 **Windows:**
 
-1. Download: https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip
-2. Extract the zip, locate `bin/ffmpeg.exe`
-3. Place `ffmpeg.exe` into `src-tauri/resources/`
-4. Also add the `bin/` directory to system PATH (optional, for global access)
+1. 下载: https://sourceforge.net/projects/mpv-player-windows/files/64bit/
+2. 解压 zip，找到 `mpv.exe`
+3. 将 `mpv.exe` 所在目录添加到系统 PATH 环境变量
 
 **macOS:**
 
 ```bash
-brew install ffmpeg
+brew install mpv
 ```
 
-**Linux:**
+**Linux (Debian/Ubuntu):**
 
 ```bash
-sudo apt install ffmpeg
+sudo apt install mpv
+```
+
+验证安装：
+
+```bash
+mpv --version
 ```
 
 ### Run

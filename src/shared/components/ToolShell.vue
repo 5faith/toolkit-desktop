@@ -4,7 +4,7 @@
       <aside class="tool-shell__sidebar">
         <slot name="sidebar" />
       </aside>
-      <main class="tool-shell__content">
+      <main class="tool-shell__content" :class="{ 'tool-shell__content--live': liveMode }">
         <slot />
       </main>
     </div>
@@ -17,6 +17,7 @@
 <script setup lang="ts">
 defineProps<{
   sidebarCollapsed?: boolean
+  liveMode?: boolean
 }>()
 </script>
 
@@ -41,6 +42,7 @@ defineProps<{
   overflow-y: auto;
   flex-shrink: 0;
   transition: width 0.2s ease;
+  background: var(--color-bg-primary);
 }
 
 .sidebar-collapsed .tool-shell__sidebar {
@@ -53,9 +55,15 @@ defineProps<{
   background: var(--color-bg-secondary);
 }
 
+.tool-shell__content--live {
+  background: transparent;
+  overflow: visible;
+}
+
 .tool-shell__statusbar {
   height: var(--statusbar-height);
   border-top: 1px solid var(--color-border);
   flex-shrink: 0;
+  background: var(--color-bg-primary);
 }
 </style>

@@ -10,9 +10,3 @@ declare module '*.js' {
   const value: unknown
   export default value
 }
-
-declare module '@/lib/mpegts.js/mpegts.min.js' {
-  import type { MpegtsStatic } from '@/lib/mpegts.js/index.d.ts'
-  const mpegts: MpegtsStatic
-  export default mpegts
-}

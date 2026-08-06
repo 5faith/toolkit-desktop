@@ -129,6 +129,7 @@ function getTimeInTz(tz: string): string {
   padding: var(--spacing-lg);
   height: 100%;
   overflow-y: auto;
+  background: var(--color-bg-secondary);
 }
 
 .timestamp-view__section {

@@ -118,6 +118,7 @@ function formatTime(ts: number): string {
   display: flex;
   flex-direction: column;
   height: 100%;
+  background: var(--color-bg-secondary);
 }
 
 .websocket-view__toolbar {

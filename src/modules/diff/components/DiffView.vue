@@ -141,6 +141,7 @@ function computeDiff() {
   display: flex;
   flex-direction: column;
   height: 100%;
+  background: var(--color-bg-secondary);
 }
 
 .diff-view__toolbar {

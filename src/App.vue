@@ -1,5 +1,5 @@
 <template>
-  <ToolShell :sidebar-collapsed="appStore.sidebarCollapsed">
+  <ToolShell :sidebar-collapsed="appStore.sidebarCollapsed" :live-mode="appStore.activeModuleId === 'live'">
     <template #sidebar>
       <div class="sidebar">
         <div
