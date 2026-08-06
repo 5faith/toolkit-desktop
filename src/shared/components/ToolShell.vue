@@ -57,7 +57,6 @@ defineProps<{
 
 .tool-shell__content--live {
   background: transparent;
-  overflow: visible;
 }
 
 .tool-shell__statusbar {

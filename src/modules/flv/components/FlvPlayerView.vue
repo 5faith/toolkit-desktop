@@ -202,7 +202,7 @@ function formatTime(seconds: number): string {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--color-bg-primary);
+  background: transparent;
 }
 
 .live-view__toolbar {
