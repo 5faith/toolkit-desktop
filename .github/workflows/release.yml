@@ -99,5 +99,5 @@ jobs:
           }
 
           Write-Host "Uploading $zipName..."
-          gh release upload $version $zipPath --repo "${{ github.repository }}" --clobber --verbose
+          gh release upload $version $zipPath --repo "${{ github.repository }}" --clobber
           Write-Host "Exit code: $LASTEXITCODE"
