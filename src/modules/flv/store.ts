@@ -1,11 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-export type StreamProtocol = 'flv' | 'rtmp' | 'rtsp'
-
 export const useLiveStore = defineStore('live', () => {
   const sourceUrl = ref('')
-  const protocol = ref<StreamProtocol>('flv')
   const playing = ref(false)
   const volume = ref(1)
   const duration = ref(0)
@@ -14,7 +11,6 @@ export const useLiveStore = defineStore('live', () => {
   const initialized = ref(false)
 
   function setSourceUrl(url: string) { sourceUrl.value = url }
-  function setProtocol(p: StreamProtocol) { protocol.value = p }
   function setPlaying(p: boolean) { playing.value = p }
   function setVolume(v: number) { volume.value = Math.max(0, Math.min(1, v)) }
   function setDuration(d: number) { duration.value = d }
@@ -23,7 +19,7 @@ export const useLiveStore = defineStore('live', () => {
   function setInitialized(v: boolean) { initialized.value = v }
 
   return {
-    sourceUrl, protocol, playing, volume, duration, currentTime, isLive, initialized,
-    setSourceUrl, setProtocol, setPlaying, setVolume, setDuration, setCurrentTime, setIsLive, setInitialized,
+    sourceUrl, playing, volume, duration, currentTime, isLive, initialized,
+    setSourceUrl, setPlaying, setVolume, setDuration, setCurrentTime, setIsLive, setInitialized,
   }
 })

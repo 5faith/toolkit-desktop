@@ -1,25 +1,21 @@
 <template>
   <div class="live-view">
     <div class="live-view__toolbar" :class="{ 'live-view__toolbar--disabled': state === 'no-mpv' }">
-      <div ref="protocolSelectRef" class="protocol-select" @click.stop="showProtocolDropdown = !showProtocolDropdown">
-        <span class="protocol-select__label">{{ protocolLabel }}</span>
-        <span class="protocol-select__arrow">▾</span>
-        <div v-if="showProtocolDropdown" class="protocol-select__dropdown">
-          <div
-            v-for="p in protocols"
-            :key="p.value"
-            class="protocol-select__option"
-            :class="{ 'protocol-select__option--active': p.value === store.protocol }"
-            @click.stop="onSelectProtocol(p.value)"
-          >
-            {{ p.label }}
+      <div class="protocol-hint" @mouseenter="showProtocolTip = true" @mouseleave="showProtocolTip = false">
+        <span class="protocol-hint__icon">?</span>
+        <div v-if="showProtocolTip" class="protocol-hint__tooltip">
+          <div class="protocol-hint__list">
+            <span>RTMP</span>
+            <span>RTSP</span>
+            <span>HTTP-FLV</span>
+            <span>WS-FLV</span>
           </div>
         </div>
       </div>
       <input
         v-model="store.sourceUrl"
         class="url-input"
-        :placeholder="urlPlaceholder"
+        placeholder="rtmp:// / rtsp:// / http://... 或 ws://..."
         :disabled="state === 'no-mpv' || state === 'connecting'"
         @keydown.enter="onLoad"
       />
@@ -107,10 +103,6 @@
         <span class="info-value">{{ store.playing ? 'Playing' : 'Paused' }}</span>
       </div>
       <div class="info-item">
-        <span class="info-label">Protocol:</span>
-        <span class="info-value">{{ store.protocol.toUpperCase() }}</span>
-      </div>
-      <div class="info-item">
         <span class="info-label">Source:</span>
         <span class="info-value">{{ store.sourceUrl || 'N/A' }}</span>
       </div>
@@ -119,53 +111,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useLiveStore, type StreamProtocol } from '../store'
+import { ref, onMounted } from 'vue'
+import { useLiveStore } from '../store'
 import { useLivePlayer } from '../composables/useFlvPlayer'
 
 const store = useLiveStore()
 const { error, state, checkMpv, loadStream, togglePlay, stop, setVolume, seek } = useLivePlayer()
 
-const protocolSelectRef = ref<HTMLDivElement>()
-const showProtocolDropdown = ref(false)
-
-const protocols: { value: StreamProtocol; label: string }[] = [
-  { value: 'flv', label: 'FLV (HTTP/WS)' },
-  { value: 'rtmp', label: 'RTMP' },
-  { value: 'rtsp', label: 'RTSP' },
-]
-
-const protocolLabel = computed(() => {
-  return protocols.find(p => p.value === store.protocol)?.label ?? store.protocol
-})
-
-const urlPlaceholder = computed(() => {
-  const map: Record<StreamProtocol, string> = {
-    'flv': 'http:// or ws:// ... stream.flv',
-    'rtmp': 'rtmp://example.com/live/stream',
-    'rtsp': 'rtsp://example.com/live/stream',
-  }
-  return map[store.protocol]
-})
-
-function onSelectProtocol(value: StreamProtocol) {
-  store.setProtocol(value)
-  showProtocolDropdown.value = false
-}
-
-function onDocumentClick(e: MouseEvent) {
-  if (protocolSelectRef.value && !protocolSelectRef.value.contains(e.target as Node)) {
-    showProtocolDropdown.value = false
-  }
-}
+const showProtocolTip = ref(false)
 
 onMounted(async () => {
-  document.addEventListener('click', onDocumentClick)
   await checkMpv()
-})
-
-onUnmounted(() => {
-  document.removeEventListener('click', onDocumentClick)
 })
 
 function onLoad() {
@@ -219,63 +175,54 @@ function formatTime(seconds: number): string {
   pointer-events: none;
 }
 
-.protocol-select {
+.protocol-hint {
   position: relative;
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  font-size: 13px;
-  background: var(--color-bg-secondary);
-  color: var(--color-text-primary);
-  outline: none;
-  cursor: pointer;
-  min-width: 100px;
   display: flex;
   align-items: center;
-  gap: var(--spacing-xs);
+  cursor: help;
+}
+
+.protocol-hint__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-secondary);
   user-select: none;
 }
 
-.protocol-select:hover {
-  border-color: var(--color-border-hover);
+.protocol-hint__icon:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
 }
 
-.protocol-select__label {
-  flex: 1;
-}
-
-.protocol-select__arrow {
-  font-size: 10px;
-  color: var(--color-text-tertiary);
-}
-
-.protocol-select__dropdown {
+.protocol-hint__tooltip {
   position: absolute;
-  top: calc(100% + 4px);
+  top: calc(100% + 6px);
   left: 0;
-  min-width: 100%;
   background: var(--color-bg-primary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
-  z-index: 100;
-  overflow: hidden;
+  padding: var(--spacing-sm);
+  z-index: 9999;
+  pointer-events: none;
 }
 
-.protocol-select__option {
-  padding: var(--spacing-xs) var(--spacing-sm);
-  font-size: 13px;
+.protocol-hint__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
   white-space: nowrap;
-  transition: background 0.1s;
-}
-
-.protocol-select__option:hover {
-  background: var(--color-bg-hover);
-}
-
-.protocol-select__option--active {
-  color: var(--color-accent);
-  background: var(--color-accent-light);
 }
 
 .url-input {
