@@ -19,10 +19,8 @@
       </div>
       <div class="formatter-view__actions">
         <button class="action-btn" @click="formatter.format()">Format</button>
-        <button class="action-btn" @click="formatter.compress()">Compress</button>
-        <button class="action-btn" @click="formatter.compressOverride()">Compress Override</button>
         <button class="action-btn" @click="formatter.unescape()">Unescape</button>
-        <button class="action-btn" @click="formatter.validate()">Validate</button>
+        <button class="action-btn" @click="handleCompressCopy">{{ compressCopied ? 'Copied!' : 'Compress Copy' }}</button>
         <button class="action-btn" @click="copyOutput">{{ copied ? 'Copied!' : 'Copy' }}</button>
       </div>
     </div>
@@ -75,16 +73,19 @@ import CodeEditor from '@shared/components/CodeEditor.vue'
 import JsonTreeView from './JsonTreeView.vue'
 import { useFormatterStore } from '../store'
 import { useFormatter } from '../composables/useFormatter'
-import { useClipboard } from '@shared/composables/useClipboard'
+import { copyToClipboard } from '@shared/utils/clipboard'
 
 const store = useFormatterStore()
 const formatter = useFormatter()
-const { copy, copied } = useClipboard()
 
 const searchKeyword = ref('')
 const searchIndex = ref(0)
 const searchTotal = ref(0)
 const treeViewRef = ref<InstanceType<typeof JsonTreeView>>()
+const compressCopied = ref(false)
+let compressCopyTimer: ReturnType<typeof setTimeout> | null = null
+const copied = ref(false)
+let copyTimer: ReturnType<typeof setTimeout> | null = null
 
 const jsonParsed = computed(() => {
   if (!store.outputText) return null
@@ -95,9 +96,30 @@ const jsonParsed = computed(() => {
   }
 })
 
-function copyOutput() {
+async function handleCompressCopy() {
+  const result = await formatter.compressCopy()
+  if (result) {
+    const success = await copyToClipboard(result)
+    if (success) {
+      compressCopied.value = true
+      if (compressCopyTimer) clearTimeout(compressCopyTimer)
+      compressCopyTimer = setTimeout(() => {
+        compressCopied.value = false
+      }, 2000)
+    }
+  }
+}
+
+async function copyOutput() {
   if (store.outputText) {
-    copy(store.outputText)
+    const success = await copyToClipboard(store.outputText)
+    if (success) {
+      copied.value = true
+      if (copyTimer) clearTimeout(copyTimer)
+      copyTimer = setTimeout(() => {
+        copied.value = false
+      }, 2000)
+    }
   }
 }
 

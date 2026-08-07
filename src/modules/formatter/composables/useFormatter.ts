@@ -42,21 +42,22 @@ export function useFormatter() {
     }
   }
 
-  async function compressOverride() {
+  async function compressCopy(): Promise<string | null> {
     try {
       if (store.mode === 'json') {
         const result = await invoke<string>('format_json', {
           input: store.inputText,
           indent: 0,
         })
-        store.setInput(result)
-        store.setOutput('')
         store.setError('')
+        return result
       } else {
         store.setError('XML compression not supported')
+        return null
       }
     } catch (e) {
       store.setError(String(e))
+      return null
     }
   }
 
@@ -78,22 +79,5 @@ export function useFormatter() {
     }
   }
 
-  async function validate() {
-    try {
-      if (store.mode === 'json') {
-        await invoke('validate_json', { input: store.inputText })
-        store.setError('')
-        return true
-      } else {
-        await invoke('validate_xml', { input: store.inputText })
-        store.setError('')
-        return true
-      }
-    } catch (e) {
-      store.setError(String(e))
-      return false
-    }
-  }
-
-  return { format, compress, compressOverride, unescape, validate }
+  return { format, compress, compressCopy, unescape }
 }
