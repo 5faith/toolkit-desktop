@@ -25,6 +25,13 @@
           <span class="sidebar__icon">{{ mod.icon }}</span>
           <span v-if="!appStore.sidebarCollapsed" class="sidebar__name">{{ mod.name }}</span>
         </div>
+        <div
+          class="sidebar__item sidebar__item--system"
+          @click="toggleTheme"
+        >
+          <span class="sidebar__icon">{{ isDark ? '☀' : '☾' }}</span>
+          <span v-if="!appStore.sidebarCollapsed" class="sidebar__name">{{ isDark ? 'Light' : 'Dark' }}</span>
+        </div>
         <button class="sidebar__toggle" @click="appStore.toggleSidebar()">
           {{ appStore.sidebarCollapsed ? '→' : '←' }}
         </button>
@@ -52,6 +59,7 @@ import NotificationContainer from '@shared/components/NotificationContainer.vue'
 import { useAppStore } from '@/stores/app'
 import { useModule } from '@shared/composables/useModule'
 import { useShortcuts } from '@shared/composables/useShortcuts'
+import { useTheme } from '@shared/composables/useTheme'
 import { registerModuleRoutes } from '@/router'
 
 const SYSTEM_MODULE_IDS = new Set(['shortcuts'])
@@ -60,6 +68,7 @@ const router = useRouter()
 const appStore = useAppStore()
 const { allModules, activeModule, switchModule } = useModule()
 useShortcuts({ onModuleSwitch: onSwitchModule })
+const { isDark, toggleTheme } = useTheme()
 
 const toolModules = computed(() => allModules.value.filter(m => !SYSTEM_MODULE_IDS.has(m.id)))
 const systemModules = computed(() => allModules.value.filter(m => SYSTEM_MODULE_IDS.has(m.id)))
