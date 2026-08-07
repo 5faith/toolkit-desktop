@@ -9,6 +9,7 @@ import liveModule from './flv'
 import encryptModule from './encrypt'
 import exifModule from './exif'
 import fileshareModule from './fileshare'
+import base64Module from './base64'
 import shortcutsModule from './shortcuts'
 
 const modules: ToolModule[] = [
@@ -20,6 +21,7 @@ const modules: ToolModule[] = [
   encryptModule,
   exifModule,
   fileshareModule,
+  base64Module,
   shortcutsModule,
 ]
 
