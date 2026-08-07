@@ -10,6 +10,7 @@ import encryptModule from './encrypt'
 import exifModule from './exif'
 import fileshareModule from './fileshare'
 import base64Module from './base64'
+import urlModule from './url'
 import shortcutsModule from './shortcuts'
 
 const modules: ToolModule[] = [
@@ -22,6 +23,7 @@ const modules: ToolModule[] = [
   exifModule,
   fileshareModule,
   base64Module,
+  urlModule,
   shortcutsModule,
 ]
 
