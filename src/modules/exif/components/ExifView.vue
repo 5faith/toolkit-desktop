@@ -19,7 +19,7 @@
     >
       <div v-if="store.loading" class="exif-view__loading-overlay">
         <div class="loading-spinner" />
-        <span class="loading-text">正在解析 EXIF 数据...</span>
+        <span class="loading-text">正在解析元数据...</span>
       </div>
 
       <template v-if="!store.fileSrc && !store.loading">
@@ -98,6 +98,27 @@
                     <span class="exif-field__value">{{ f.value }}</span>
                   </div>
                 </div>
+                <div v-if="activeTab === 'xmp'" class="exif-group">
+                  <div class="exif-group__title">XMP 数据</div>
+                  <div v-for="f in xmpFields" :key="f.label" class="exif-field">
+                    <span class="exif-field__label">{{ f.label }}</span>
+                    <span class="exif-field__value">{{ f.value }}</span>
+                  </div>
+                </div>
+                <div v-if="activeTab === 'iptc'" class="exif-group">
+                  <div class="exif-group__title">IPTC 数据</div>
+                  <div v-for="f in iptcFields" :key="f.label" class="exif-field">
+                    <span class="exif-field__label">{{ f.label }}</span>
+                    <span class="exif-field__value">{{ f.value }}</span>
+                  </div>
+                </div>
+                <div v-if="activeTab === 'icc'" class="exif-group">
+                  <div class="exif-group__title">ICC 配置文件</div>
+                  <div v-for="f in iccFields" :key="f.label" class="exif-field">
+                    <span class="exif-field__label">{{ f.label }}</span>
+                    <span class="exif-field__value">{{ f.value }}</span>
+                  </div>
+                </div>
                 <div v-if="activeTab === 'all'" class="exif-group">
                   <div class="exif-group__title">全部数据 ({{ allFields.length }})</div>
                   <div v-for="f in allFields" :key="f.label" class="exif-field">
@@ -108,7 +129,7 @@
               </div>
             </template>
 
-            <div v-else class="data-panel__empty">未找到 EXIF 数据</div>
+            <div v-else class="data-panel__empty">未找到元数据</div>
           </div>
         </div>
       </template>
@@ -131,14 +152,26 @@ interface ExifField {
 
 const activeTab = ref('camera')
 
-const tabs = [
-  { id: 'camera', label: '相机' },
-  { id: 'gps', label: 'GPS / 位置' },
-  { id: 'shooting', label: '拍摄参数' },
-  { id: 'time', label: '日期与时间' },
-  { id: 'software', label: '元数据' },
-  { id: 'all', label: '全部数据' },
-]
+const tabs = computed(() => {
+  const base = [
+    { id: 'camera', label: '相机' },
+    { id: 'gps', label: 'GPS / 位置' },
+    { id: 'shooting', label: '拍摄参数' },
+    { id: 'time', label: '日期与时间' },
+    { id: 'software', label: '元数据' },
+  ]
+  if (store.exifData?.xmpFields && store.exifData.xmpFields.length > 0) {
+    base.push({ id: 'xmp', label: `XMP (${store.exifData.xmpFields.length})` })
+  }
+  if (store.exifData?.iptcFields && store.exifData.iptcFields.length > 0) {
+    base.push({ id: 'iptc', label: `IPTC (${store.exifData.iptcFields.length})` })
+  }
+  if (store.exifData?.iccFields && store.exifData.iccFields.length > 0) {
+    base.push({ id: 'icc', label: `ICC (${store.exifData.iccFields.length})` })
+  }
+  base.push({ id: 'all', label: '全部数据' })
+  return base
+})
 
 const cameraTags = new Set([
   'Make', 'Model', 'BodySerialNumber', 'LensModel', 'LensSerialNumber',
@@ -174,9 +207,40 @@ const shootingFields = computed<ExifField[]>(() => filterByTags(shootingTags))
 const timeFields = computed<ExifField[]>(() => filterByTags(timeTags))
 const softwareFields = computed<ExifField[]>(() => filterByTags(softwareTags))
 
+const xmpFields = computed<ExifField[]>(() => {
+  if (!store.exifData?.xmpFields) return []
+  return store.exifData.xmpFields.map(f => ({ label: f.tag, value: f.value }))
+})
+
+const iptcFields = computed<ExifField[]>(() => {
+  if (!store.exifData?.iptcFields) return []
+  return store.exifData.iptcFields.map(f => ({ label: f.tag, value: f.value }))
+})
+
+const iccFields = computed<ExifField[]>(() => {
+  if (!store.exifData?.iccFields) return []
+  return store.exifData.iccFields.map(f => ({ label: f.tag, value: f.value }))
+})
+
 const allFields = computed<ExifField[]>(() => {
   if (!store.exifData?.allFields) return []
-  return store.exifData.allFields.map(f => ({ label: f.tag, value: f.value }))
+  const base = store.exifData.allFields.map(f => ({ label: f.tag, value: f.value }))
+  if (store.exifData.xmpFields) {
+    for (const f of store.exifData.xmpFields) {
+      base.push({ label: `[XMP] ${f.tag}`, value: f.value })
+    }
+  }
+  if (store.exifData.iptcFields) {
+    for (const f of store.exifData.iptcFields) {
+      base.push({ label: `[IPTC] ${f.tag}`, value: f.value })
+    }
+  }
+  if (store.exifData.iccFields) {
+    for (const f of store.exifData.iccFields) {
+      base.push({ label: `[ICC] ${f.tag}`, value: f.value })
+    }
+  }
+  return base
 })
 
 function filterByTags(tags: Set<string>): ExifField[] {

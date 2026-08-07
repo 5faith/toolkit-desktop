@@ -34,6 +34,9 @@ export interface ExifData {
   orientation?: number
   totalTags?: number
   allFields?: ExifField[]
+  xmpFields?: ExifField[]
+  iptcFields?: ExifField[]
+  iccFields?: ExifField[]
 }
 
 export const useExifStore = defineStore('exif', () => {
