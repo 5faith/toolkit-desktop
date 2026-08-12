@@ -228,15 +228,9 @@ export function useFileShare() {
     if (!isTauri) return
     const win = getCurrentWebviewWindow()
     win.onDragDropEvent((event) => {
-      if (event.payload.type === 'enter') {
-        store.setDragging(true)
-      } else if (event.payload.type === 'leave') {
-        store.setDragging(false)
-      } else if (event.payload.type === 'drop') {
-        store.setDragging(false)
-        if (event.payload.paths.length > 0) {
-          addManualFiles(event.payload.paths)
-        }
+      console.log('[fileshare-drag]', event.payload.type, event.payload)
+      if (event.payload.type === 'drop' && event.payload.paths.length > 0) {
+        addManualFiles(event.payload.paths)
       }
     })
   }
