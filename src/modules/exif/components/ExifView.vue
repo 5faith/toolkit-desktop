@@ -2,6 +2,15 @@
   <div class="exif-view">
     <div class="exif-view__toolbar">
       <button class="action-btn" @click="pickFile">选择文件</button>
+      <div class="toolbar__path-input">
+        <input
+          class="toolbar__input"
+          placeholder="输入文件路径..."
+          v-model="filePathInput"
+          @keydown.enter="importByPath"
+        />
+        <button class="action-btn" @click="importByPath">导入</button>
+      </div>
       <button v-if="store.fileSrc" class="action-btn" @click="clearAll">清除</button>
       <div v-if="store.fileSrc && store.exifData" class="toolbar__spacer" />
       <span v-if="store.exifData" class="tag-count">找到 {{ store.exifData.totalTags || 0 }} 个标签</span>
@@ -14,8 +23,6 @@
     <div
       class="exif-view__drop-zone"
       :class="{ 'exif-view__drop-zone--active': store.fileSrc }"
-      @drop="handleDrop"
-      @dragover="handleDragOver"
     >
       <div v-if="store.loading" class="exif-view__loading-overlay">
         <div class="loading-spinner" />
@@ -143,7 +150,15 @@ import { useExifStore } from '../store'
 import { useExif } from '../composables/useExif'
 
 const store = useExifStore()
-const { pickFile, handleDrop, handleDragOver, clearAll, formatSize } = useExif()
+const { pickFile, processFile, clearAll, formatSize } = useExif()
+
+const filePathInput = ref('')
+
+async function importByPath() {
+  const path = filePathInput.value.trim()
+  if (!path) return
+  await processFile(path)
+}
 
 interface ExifField {
   label: string
@@ -331,6 +346,29 @@ function downloadFile(content: string, filename: string, mimeType: string) {
 .action-btn:hover {
   background: var(--color-bg-hover);
   border-color: var(--color-border-hover);
+}
+
+.toolbar__path-input {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex: 1;
+  max-width: 400px;
+}
+
+.toolbar__input {
+  flex: 1;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  outline: none;
+}
+
+.toolbar__input:focus {
+  border-color: var(--color-accent);
 }
 
 .exif-view__drop-zone {

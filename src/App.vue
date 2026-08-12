@@ -85,17 +85,6 @@ onMounted(async () => {
     const first = allModules.value[0]
     onSwitchModule(first.id)
   }
-
-  const isTauri = !!(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__
-  if (isTauri) {
-    const { getCurrentWebviewWindow } = await import('@tauri-apps/api/webviewWindow')
-    const win = getCurrentWebviewWindow()
-    await win.onDragDropEvent((event) => {
-      console.log('[drag-drop]', JSON.stringify(event.payload))
-    })
-    console.log('[drag-drop] registered, label:', win.label)
-    console.log('[drag-drop] try dragging a file now...')
-  }
 })
 </script>
 

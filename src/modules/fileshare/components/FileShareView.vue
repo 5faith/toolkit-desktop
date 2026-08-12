@@ -78,13 +78,15 @@
             </div>
           </div>
           <div class="fs-card__body">
-            <div
-              class="fs-dropzone"
-              :class="{ 'fs-dropzone--active': store.isDragging }"
-              @click="pickFiles"
-            >
-              <template v-if="store.isDragging">释放文件以添加分享</template>
-              <template v-else>拖拽文件到此处，或<span class="fs-dropzone__link">点击选择</span>进行分享~</template>
+            <div class="fs-add-row">
+              <input
+                class="fs-add-input"
+                placeholder="输入文件路径..."
+                v-model="filePathInput"
+                @keydown.enter="importByPath"
+              />
+              <button class="btn btn--outline" @click="importByPath">添加</button>
+              <button class="btn btn--outline" @click="pickFiles">选择文件</button>
             </div>
 
             <div class="fs-file-list">
@@ -226,7 +228,7 @@ const {
   error, interfaces, selectedIp,
   loadInterfaces, selectIp, startServer, stopServer,
   refreshLink, refreshDirectoryFiles, copyLink, copyDownloadLink, openFolder, shareText, pickFiles,
-  removeManualFile, clearManualFiles, initDragDrop,
+  addManualFiles, removeManualFile, clearManualFiles,
 } = useFileShare()
 const notification = useNotification()
 
@@ -234,11 +236,18 @@ const errors = reactive<SettingsErrors>({})
 const showShareText = ref(false)
 const shareTextFilename = ref('note.txt')
 const shareTextContent = ref('')
+const filePathInput = ref('')
 
 onMounted(() => {
   loadInterfaces()
-  initDragDrop()
 })
+
+async function importByPath() {
+  const path = filePathInput.value.trim()
+  if (!path) return
+  await addManualFiles([path])
+  filePathInput.value = ''
+}
 
 async function onForceStop() {
   error.value = ''
@@ -580,6 +589,27 @@ function closeSettings() {
 .fs-dropzone__link {
   color: var(--color-accent);
   text-decoration: underline;
+}
+
+.fs-add-row {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.fs-add-input {
+  flex: 1;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  outline: none;
+}
+
+.fs-add-input:focus {
+  border-color: var(--color-accent);
 }
 
 .fs-file-list {

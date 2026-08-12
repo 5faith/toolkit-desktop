@@ -1,7 +1,6 @@
 import { ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
-import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { useFileshareStore, type SharedFile, type NetworkInterface } from '../store'
 
 let fileCounter = 0
@@ -224,17 +223,6 @@ export function useFileShare() {
     }
   }
 
-  function initDragDrop() {
-    if (!isTauri) return
-    const win = getCurrentWebviewWindow()
-    win.onDragDropEvent((event) => {
-      console.log('[fileshare-drag]', event.payload.type, event.payload)
-      if (event.payload.type === 'drop' && event.payload.paths.length > 0) {
-        addManualFiles(event.payload.paths)
-      }
-    })
-  }
-
   return {
     error,
     interfaces,
@@ -253,6 +241,5 @@ export function useFileShare() {
     removeManualFile,
     clearManualFiles,
     pickFiles,
-    initDragDrop,
   }
 }
