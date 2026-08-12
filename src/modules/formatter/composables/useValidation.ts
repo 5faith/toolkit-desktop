@@ -1,3 +1,5 @@
+import { parse as yamlParse } from 'yaml'
+
 export function useValidation() {
   function validateJsonSyntax(input: string): { valid: boolean; error?: string } {
     try {
@@ -22,5 +24,14 @@ export function useValidation() {
     }
   }
 
-  return { validateJsonSyntax, validateXmlSyntax }
+  function validateYamlSyntax(input: string): { valid: boolean; error?: string } {
+    try {
+      yamlParse(input)
+      return { valid: true }
+    } catch (e) {
+      return { valid: false, error: String(e) }
+    }
+  }
+
+  return { validateJsonSyntax, validateXmlSyntax, validateYamlSyntax }
 }

@@ -8,8 +8,10 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::formatter::format_json,
             commands::formatter::format_xml,
+            commands::formatter::format_yaml,
             commands::formatter::validate_json,
             commands::formatter::validate_xml,
+            commands::formatter::validate_yaml,
             commands::timestamp::get_system_timestamp,
             commands::timestamp::convert_timestamp,
             commands::diff::compute_diff,
@@ -26,6 +28,7 @@ pub fn run() {
             commands::fileshare::register_shared_file,
             commands::fileshare::unregister_shared_file,
             commands::fileshare::clear_shared_files_registry,
+            commands::fileshare::list_directory_files,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

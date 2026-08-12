@@ -57,6 +57,8 @@ watch(() => props.modelValue, () => {
     }
   })
 })
+
+defineExpose({ textareaRef })
 </script>
 
 <style scoped>

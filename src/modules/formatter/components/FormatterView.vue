@@ -16,11 +16,18 @@
         >
           XML
         </button>
+        <button
+          class="mode-btn"
+          :class="{ 'mode-btn--active': store.mode === 'yaml' }"
+          @click="store.setMode('yaml')"
+        >
+          YAML
+        </button>
       </div>
       <div class="formatter-view__actions">
         <button class="action-btn" @click="formatter.format()">Format</button>
-        <button class="action-btn" @click="formatter.unescape()">Unescape</button>
-        <button class="action-btn" @click="handleCompressCopy">{{ compressCopied ? 'Copied!' : 'Compress Copy' }}</button>
+        <button class="action-btn" :disabled="store.mode === 'yaml'" @click="formatter.unescape()">Unescape</button>
+        <button class="action-btn" :disabled="store.mode === 'yaml'" @click="handleCompressCopy">{{ compressCopied ? 'Copied!' : 'Compress Copy' }}</button>
         <button class="action-btn" @click="copyOutput">{{ copied ? 'Copied!' : 'Copy' }}</button>
       </div>
     </div>
@@ -32,7 +39,7 @@
       <div class="formatter-view__panel">
         <div class="panel-header">
           <span>Output</span>
-          <div v-if="store.outputText && store.mode === 'json'" class="search-box">
+          <div v-if="store.outputText" class="search-box">
             <input
               v-model="searchKeyword"
               class="search-input"
@@ -51,12 +58,30 @@
               ref="treeViewRef"
               :data="jsonParsed"
               :search="searchKeyword"
-              class="json-output"
+              class="tree-output"
+              @search-change="onSearchChange"
+            />
+          </template>
+          <template v-else-if="store.mode === 'xml' && store.outputText">
+            <XmlTreeView
+              ref="xmlTreeViewRef"
+              :xml-text="store.outputText"
+              :search="searchKeyword"
+              class="tree-output"
+              @search-change="onSearchChange"
+            />
+          </template>
+          <template v-else-if="store.mode === 'yaml' && store.outputText">
+            <YamlTreeView
+              ref="yamlTreeViewRef"
+              :yaml-text="store.outputText"
+              :search="searchKeyword"
+              class="tree-output"
               @search-change="onSearchChange"
             />
           </template>
           <template v-else>
-            <CodeEditor v-model="store.outputText" placeholder="Formatted output..." :readonly="true" show-line-numbers />
+            <CodeEditor ref="outputEditorRef" v-model="store.outputText" placeholder="Formatted output..." :readonly="true" show-line-numbers />
           </template>
         </div>
       </div>
@@ -68,9 +93,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick, watch } from 'vue'
 import CodeEditor from '@shared/components/CodeEditor.vue'
 import JsonTreeView from './JsonTreeView.vue'
+import XmlTreeView from './XmlTreeView.vue'
+import YamlTreeView from './YamlTreeView.vue'
 import { useFormatterStore } from '../store'
 import { useFormatter } from '../composables/useFormatter'
 import { copyToClipboard } from '@shared/utils/clipboard'
@@ -82,6 +109,9 @@ const searchKeyword = ref('')
 const searchIndex = ref(0)
 const searchTotal = ref(0)
 const treeViewRef = ref<InstanceType<typeof JsonTreeView>>()
+const xmlTreeViewRef = ref<InstanceType<typeof XmlTreeView>>()
+const yamlTreeViewRef = ref<InstanceType<typeof YamlTreeView>>()
+const outputEditorRef = ref<InstanceType<typeof CodeEditor>>()
 const compressCopied = ref(false)
 let compressCopyTimer: ReturnType<typeof setTimeout> | null = null
 const copied = ref(false)
@@ -129,6 +159,7 @@ function onSearchEnter() {
 
 function onSearchInput() {
   searchIndex.value = 0
+  updateTextSearchTotal()
 }
 
 function onSearchChange(info: { currentIndex: number; totalCount: number }) {
@@ -136,13 +167,93 @@ function onSearchChange(info: { currentIndex: number; totalCount: number }) {
   searchTotal.value = info.totalCount
 }
 
+function updateTextSearchTotal() {
+  if (store.mode === 'json') return
+  const text = store.outputText
+  const keyword = searchKeyword.value
+  if (!text || !keyword) {
+    searchTotal.value = 0
+    searchIndex.value = 0
+    return
+  }
+  let count = 0
+  let pos = 0
+  const lowerText = text.toLowerCase()
+  const lowerKeyword = keyword.toLowerCase()
+  while ((pos = lowerText.indexOf(lowerKeyword, pos)) !== -1) {
+    count++
+    pos += lowerKeyword.length
+  }
+  searchTotal.value = count
+  if (count > 0 && searchIndex.value >= count) {
+    searchIndex.value = 0
+  }
+  highlightTextMatch()
+}
+
+function highlightTextMatch() {
+  if (store.mode === 'json') return
+  const textarea = outputEditorRef.value?.textareaRef
+  if (!textarea || !searchKeyword.value || searchTotal.value === 0) return
+  const text = store.outputText
+  const keyword = searchKeyword.value
+  const lowerText = text.toLowerCase()
+  const lowerKeyword = keyword.toLowerCase()
+  let pos = 0
+  let matchIndex = 0
+  while (pos < lowerText.length) {
+    const found = lowerText.indexOf(lowerKeyword, pos)
+    if (found === -1) break
+    if (matchIndex === searchIndex.value) {
+      textarea.focus()
+      textarea.setSelectionRange(found, found + keyword.length)
+      const lineHeight = 20.8
+      const linesBefore = text.substring(0, found).split('\n').length - 1
+      textarea.scrollTop = Math.max(0, linesBefore * lineHeight - textarea.clientHeight / 2)
+      return
+    }
+    matchIndex++
+    pos = found + lowerKeyword.length
+  }
+}
+
 function searchNext() {
-  treeViewRef.value?.nextMatch()
+  if (store.mode === 'json') {
+    treeViewRef.value?.nextMatch()
+  } else if (store.mode === 'xml') {
+    xmlTreeViewRef.value?.nextMatch()
+  } else if (store.mode === 'yaml') {
+    yamlTreeViewRef.value?.nextMatch()
+  } else {
+    if (searchTotal.value === 0) return
+    searchIndex.value = (searchIndex.value + 1) % searchTotal.value
+    highlightTextMatch()
+  }
 }
 
 function searchPrev() {
-  treeViewRef.value?.prevMatch()
+  if (store.mode === 'json') {
+    treeViewRef.value?.prevMatch()
+  } else if (store.mode === 'xml') {
+    xmlTreeViewRef.value?.prevMatch()
+  } else if (store.mode === 'yaml') {
+    yamlTreeViewRef.value?.prevMatch()
+  } else {
+    if (searchTotal.value === 0) return
+    searchIndex.value = (searchIndex.value - 1 + searchTotal.value) % searchTotal.value
+    highlightTextMatch()
+  }
 }
+
+watch(() => store.mode, () => {
+  searchKeyword.value = ''
+  searchIndex.value = 0
+  searchTotal.value = 0
+})
+
+watch(searchKeyword, () => {
+  nextTick(updateTextSearchTotal)
+})
 </script>
 
 <style scoped>
@@ -200,9 +311,14 @@ function searchPrev() {
   transition: all 0.15s;
 }
 
-.action-btn:hover {
+.action-btn:hover:not(:disabled) {
   background: var(--color-bg-hover);
   border-color: var(--color-border-hover);
+}
+
+.action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .formatter-view__panels {
@@ -293,10 +409,12 @@ function searchPrev() {
 
 .panel-body {
   flex: 1;
+  display: flex;
+  flex-direction: column;
   overflow: auto;
 }
 
-.json-output {
+.tree-output {
   flex: 1;
 }
 

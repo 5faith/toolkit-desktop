@@ -31,6 +31,12 @@ pub fn format_xml(input: &str) -> Result<String, String> {
 }
 
 #[tauri::command]
+pub fn format_yaml(input: &str) -> Result<String, String> {
+    let doc: serde_yaml::Value = serde_yaml::from_str(input).map_err(|e| e.to_string())?;
+    serde_yaml::to_string(&doc).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn validate_json(input: &str) -> Result<bool, String> {
     match serde_json::from_str::<Value>(input) {
         Ok(_) => Ok(true),
@@ -51,4 +57,10 @@ pub fn validate_xml(input: &str) -> Result<bool, String> {
         }
         buf.clear();
     }
+}
+
+#[tauri::command]
+pub fn validate_yaml(input: &str) -> Result<bool, String> {
+    let _doc: serde_yaml::Value = serde_yaml::from_str(input).map_err(|e| e.to_string())?;
+    Ok(true)
 }

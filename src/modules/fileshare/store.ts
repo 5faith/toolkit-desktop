@@ -31,6 +31,7 @@ export interface SettingsErrors {
 }
 
 const SETTINGS_KEY = 'fileshare:settings'
+const MANUAL_FILES_KEY = 'fileshare:manualFiles'
 
 const defaultSettings: FileShareSettings = {
   autoStart: false,
@@ -45,7 +46,9 @@ export const useFileshareStore = defineStore('fileshare', () => {
   const shareLink = ref('')
   const currentIp = ref('')
   const useIpv6 = ref(false)
-  const sharedFiles = ref<SharedFile[]>([])
+  const directoryFiles = ref<SharedFile[]>([])
+  const manualFiles = ref<SharedFile[]>([])
+  const isDragging = ref(false)
 
   const settings = ref<FileShareSettings>({ ...defaultSettings })
   const showSettings = ref(false)
@@ -53,10 +56,16 @@ export const useFileshareStore = defineStore('fileshare', () => {
   onMounted(async () => {
     const saved = await getStorageItem<FileShareSettings>(SETTINGS_KEY, { ...defaultSettings })
     settings.value = saved
+    const savedManual = await getStorageItem<SharedFile[]>(MANUAL_FILES_KEY, [])
+    manualFiles.value = savedManual
   })
 
   watch(settings, (v) => {
     setStorageItem(SETTINGS_KEY, v)
+  }, { deep: true })
+
+  watch(manualFiles, (v) => {
+    setStorageItem(MANUAL_FILES_KEY, v)
   }, { deep: true })
 
   function validateSettings(): SettingsErrors {
@@ -98,16 +107,24 @@ export const useFileshareStore = defineStore('fileshare', () => {
     useIpv6.value = !useIpv6.value
   }
 
-  function addFile(file: SharedFile) {
-    sharedFiles.value.push(file)
+  function addDirectoryFile(file: SharedFile) {
+    directoryFiles.value.push(file)
   }
 
-  function removeFile(id: string) {
-    sharedFiles.value = sharedFiles.value.filter(f => f.id !== id)
+  function setDirectoryFiles(files: SharedFile[]) {
+    directoryFiles.value = files
   }
 
-  function clearFiles() {
-    sharedFiles.value = []
+  function addManualFile(file: SharedFile) {
+    manualFiles.value.push(file)
+  }
+
+  function removeManualFile(id: string) {
+    manualFiles.value = manualFiles.value.filter(f => f.id !== id)
+  }
+
+  function clearManualFiles() {
+    manualFiles.value = []
   }
 
   function updateSettings(partial: Partial<FileShareSettings>) {
@@ -118,12 +135,18 @@ export const useFileshareStore = defineStore('fileshare', () => {
     showSettings.value = !showSettings.value
   }
 
+  function setDragging(v: boolean) {
+    isDragging.value = v
+  }
+
   return {
     running,
     shareLink,
     currentIp,
     useIpv6,
-    sharedFiles,
+    directoryFiles,
+    manualFiles,
+    isDragging,
     settings,
     showSettings,
     validateSettings,
@@ -131,10 +154,13 @@ export const useFileshareStore = defineStore('fileshare', () => {
     setShareLink,
     setCurrentIp,
     toggleIpv6,
-    addFile,
-    removeFile,
-    clearFiles,
+    addDirectoryFile,
+    setDirectoryFiles,
+    addManualFile,
+    removeManualFile,
+    clearManualFiles,
     updateSettings,
     toggleSettings,
+    setDragging,
   }
 })

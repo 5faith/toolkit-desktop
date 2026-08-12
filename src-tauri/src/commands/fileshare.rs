@@ -75,18 +75,30 @@ pub async fn start_file_share(settings: FileShareSettings) -> Result<(), String>
                 axum::response::Html(INDEX_HTML)
             }),
         )
+        .route(
+            "/__shutdown",
+            axum::routing::get(|| async {
+                if let Some(tx) = get_shutdown_sender().lock().ok().and_then(|mut s| s.take()) {
+                    let _ = tx.send(());
+                }
+                "ok"
+            }),
+        )
         .layer(
             tower_http::cors::CorsLayer::permissive(),
         );
 
+    let listener = tokio::net::TcpListener::bind(addr)
+        .await
+        .map_err(|e| format!("端口 {} 被占用或无法绑定: {}", settings.port, e))?;
+
     tokio::spawn(async move {
-        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
         axum::serve(listener, app)
             .with_graceful_shutdown(async {
                 rx.await.ok();
             })
             .await
-            .unwrap();
+            .ok();
     });
 
     Ok(())
@@ -271,6 +283,32 @@ pub fn clear_shared_files_registry() -> Result<(), String> {
     let mut files = get_shared_files().lock().map_err(|e| e.to_string())?;
     files.clear();
     Ok(())
+}
+
+#[tauri::command]
+pub fn list_directory_files(dir_path: String) -> Result<Vec<FileInfo>, String> {
+    let dir = std::path::Path::new(&dir_path);
+    if !dir.exists() {
+        return Err(format!("Directory not found: {}", dir_path));
+    }
+    let mut result = Vec::new();
+    let entries = std::fs::read_dir(dir).map_err(|e| e.to_string())?;
+    for entry in entries {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let path = entry.path();
+        if path.is_file() {
+            let name = path
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default();
+            let meta = std::fs::metadata(&path).map_err(|e| e.to_string())?;
+            result.push(FileInfo {
+                name,
+                size: meta.len(),
+            });
+        }
+    }
+    Ok(result)
 }
 
 async fn serve_shared_file(

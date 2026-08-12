@@ -4,6 +4,7 @@
       <div class="fileshare-view__idle">
         <button class="settings-btn" @click="store.toggleSettings()">⚙ 设置</button>
         <button class="start-btn" @click="startServer">开启服务</button>
+        <button class="stop-btn" @click="onForceStop">⏹ 关闭残留服务</button>
         <button class="open-dir-btn" @click="openFolder()">📁 打开上传目录</button>
         <div v-if="error" class="fs-error">{{ error }}</div>
       </div>
@@ -45,23 +46,49 @@
 
         <div class="fs-card">
           <div class="fs-card__header">
-            <span class="fs-list-title">分享列表</span>
+            <span class="fs-list-title">上传目录文件</span>
+            <div class="fs-list-actions">
+              <button class="btn btn--outline" @click="openFolder()">📁 打开目录</button>
+              <button class="btn btn--outline" @click="refreshDirectoryFiles()">🔄 刷新</button>
+            </div>
+          </div>
+          <div class="fs-card__body">
+            <div class="fs-file-list">
+              <div v-for="file in store.directoryFiles" :key="file.id" class="fs-file-row">
+                <span class="fs-file-name">{{ file.name }}</span>
+                <span class="fs-file-size">{{ formatFileSize(file.size) }}</span>
+                <div class="fs-file-actions">
+                  <button class="btn-icon" title="复制下载链接" @click="onCopyDownloadLink(file)">🔗</button>
+                  <button class="btn-icon" title="打开文件夹" @click="openFolderForFile(file)">📁</button>
+                </div>
+              </div>
+              <div v-if="store.directoryFiles.length === 0" class="fs-file-empty">
+                目录为空
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="fs-card">
+          <div class="fs-card__header">
+            <span class="fs-list-title">手动添加的文件</span>
             <div class="fs-list-actions">
               <button class="btn btn--outline" @click="showShareText = true">✉ 分享文本</button>
-              <button class="btn btn--outline" @click="openFolder()">📁 打开上传目录</button>
               <button class="btn btn--outline" @click="onClearFiles">🗑 清空列表</button>
             </div>
           </div>
           <div class="fs-card__body">
             <div
               class="fs-dropzone"
+              :class="{ 'fs-dropzone--active': store.isDragging }"
               @click="pickFiles"
             >
-              点击<span class="fs-dropzone__link">选择文件</span>进行分享~
+              <template v-if="store.isDragging">释放文件以添加分享</template>
+              <template v-else>拖拽文件到此处，或<span class="fs-dropzone__link">点击选择</span>进行分享~</template>
             </div>
 
             <div class="fs-file-list">
-              <div v-for="file in store.sharedFiles" :key="file.id" class="fs-file-row">
+              <div v-for="file in store.manualFiles" :key="file.id" class="fs-file-row">
                 <span class="fs-file-name">{{ file.name }}</span>
                 <span class="fs-file-size">{{ formatFileSize(file.size) }}</span>
                 <div class="fs-file-actions">
@@ -70,8 +97,8 @@
                   <button class="btn-icon" title="删除" @click="onRemoveFile(file)">🗑</button>
                 </div>
               </div>
-              <div v-if="store.sharedFiles.length === 0" class="fs-file-empty">
-                暂无分享文件
+              <div v-if="store.manualFiles.length === 0" class="fs-file-empty">
+                暂无手动添加的文件
               </div>
             </div>
           </div>
@@ -198,8 +225,8 @@ const store = useFileshareStore()
 const {
   error, interfaces, selectedIp,
   loadInterfaces, selectIp, startServer, stopServer,
-  refreshLink, copyLink, copyDownloadLink, openFolder, shareText, pickFiles,
-  removeFile, clearFiles,
+  refreshLink, refreshDirectoryFiles, copyLink, copyDownloadLink, openFolder, shareText, pickFiles,
+  removeManualFile, clearManualFiles, initDragDrop,
 } = useFileShare()
 const notification = useNotification()
 
@@ -210,7 +237,23 @@ const shareTextContent = ref('')
 
 onMounted(() => {
   loadInterfaces()
+  initDragDrop()
 })
+
+async function onForceStop() {
+  error.value = ''
+  try {
+    await fetch(`http://127.0.0.1:${store.settings.port}/__shutdown`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(2000),
+    }).catch(() => {})
+    await new Promise(r => setTimeout(r, 300))
+    await stopServer()
+    notification.success('服务已关闭')
+  } catch (e) {
+    error.value = String(e)
+  }
+}
 
 function switchIpv6() {
   store.toggleIpv6()
@@ -240,14 +283,14 @@ async function onCopyDownloadLink(file: SharedFile) {
 async function onRemoveFile(file: SharedFile) {
   const confirmed = await confirm(`确定删除「${file.name}」？`, { title: '删除确认', kind: 'warning' })
   if (confirmed) {
-    await removeFile(file)
+    await removeManualFile(file)
   }
 }
 
 async function onClearFiles() {
-  const confirmed = await confirm('确定清空所有分享文件？', { title: '清空确认', kind: 'warning' })
+  const confirmed = await confirm('确定清空手动添加的文件？', { title: '清空确认', kind: 'warning' })
   if (confirmed) {
-    await clearFiles()
+    await clearManualFiles()
   }
 }
 
@@ -314,6 +357,7 @@ function closeSettings() {
   align-items: center;
   justify-content: center;
   height: 100%;
+  gap: var(--spacing-md);
   background: linear-gradient(135deg, #c3d4f9 0%, #d5b3f7 50%, #f5c6e8 100%);
   position: relative;
 }
@@ -339,6 +383,22 @@ function closeSettings() {
 
 .start-btn:active {
   transform: scale(0.98);
+}
+
+.stop-btn {
+  padding: var(--spacing-sm) var(--spacing-xl);
+  border-radius: var(--radius-md);
+  background: var(--color-error);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.stop-btn:hover {
+  opacity: 0.85;
 }
 
 .settings-btn {
@@ -509,6 +569,12 @@ function closeSettings() {
 
 .fs-dropzone:hover {
   border-color: var(--color-accent);
+}
+
+.fs-dropzone--active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-light);
+  color: var(--color-accent);
 }
 
 .fs-dropzone__link {

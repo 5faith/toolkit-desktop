@@ -1,5 +1,6 @@
 import { useFormatterStore } from '../store'
 import { invoke } from '@tauri-apps/api/core'
+import { parse as yamlParse, stringify as yamlStringify } from 'yaml'
 
 export function useFormatter() {
   const store = useFormatterStore()
@@ -11,6 +12,11 @@ export function useFormatter() {
           input: store.inputText,
           indent: store.indentSize,
         })
+        store.setOutput(result)
+        store.setError('')
+      } else if (store.mode === 'yaml') {
+        const doc = yamlParse(store.inputText)
+        const result = yamlStringify(doc, { indent: store.indentSize })
         store.setOutput(result)
         store.setError('')
       } else {
@@ -34,6 +40,12 @@ export function useFormatter() {
         })
         store.setOutput(result)
         store.setError('')
+      } else if (store.mode === 'yaml') {
+        const doc = yamlParse(store.inputText)
+        const result = yamlStringify(doc, { indent: store.indentSize, lineWidth: 0 })
+          .replace(/\n\s*\n/g, '\n')
+        store.setOutput(result)
+        store.setError('')
       } else {
         store.setError('XML compression not supported')
       }
@@ -49,6 +61,12 @@ export function useFormatter() {
           input: store.inputText,
           indent: 0,
         })
+        store.setError('')
+        return result
+      } else if (store.mode === 'yaml') {
+        const doc = yamlParse(store.inputText)
+        const result = yamlStringify(doc, { indent: store.indentSize, lineWidth: 0 })
+          .replace(/\n\s*\n/g, '\n')
         store.setError('')
         return result
       } else {

@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-export type FormatMode = 'json' | 'xml'
+export type FormatMode = 'json' | 'xml' | 'yaml'
 
 export const useFormatterStore = defineStore('formatter', () => {
   const inputText = ref('')

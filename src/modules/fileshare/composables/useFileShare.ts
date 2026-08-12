@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { useFileshareStore, type SharedFile, type NetworkInterface } from '../store'
 
 let fileCounter = 0
@@ -24,6 +25,10 @@ async function safeInvoke<T>(cmd: string, args?: Record<string, unknown>): Promi
       register_shared_file: { name: 'mock-file.txt', size: 1024 },
       unregister_shared_file: undefined,
       clear_shared_files_registry: undefined,
+      list_directory_files: [
+        { name: 'doc1.pdf', size: 2048 },
+        { name: 'image.png', size: 4096 },
+      ],
     }
     console.warn(`[fileshare] browser mock: invoke('${cmd}')`)
     return mocks[cmd] as T
@@ -65,6 +70,14 @@ export function useFileShare() {
     store.setRunning(true)
 
     try {
+      await fetch(`http://127.0.0.1:${store.settings.port}/__shutdown`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(2000),
+      }).catch(() => {})
+      await new Promise(r => setTimeout(r, 300))
+    } catch { /* ignore - residual server may not exist */ }
+
+    try {
       await safeInvoke('start_file_share', {
         settings: {
           port: store.settings.port,
@@ -83,6 +96,8 @@ export function useFileShare() {
       } catch {
         store.setShareLink(`http://localhost:${store.settings.port}`)
       }
+
+      await refreshDirectoryFiles()
     } catch (e) {
       error.value = String(e)
       store.setRunning(false)
@@ -95,6 +110,7 @@ export function useFileShare() {
       await safeInvoke('stop_file_share')
       store.setRunning(false)
       store.setShareLink('')
+      store.setDirectoryFiles([])
     } catch (e) {
       error.value = String(e)
     }
@@ -109,6 +125,24 @@ export function useFileShare() {
       store.setShareLink(`http://${ip}:${store.settings.port}`)
     } catch {
       store.setShareLink(`http://localhost:${store.settings.port}`)
+    }
+  }
+
+  async function refreshDirectoryFiles() {
+    try {
+      const files = await safeInvoke<{ name: string; size: number }[]>('list_directory_files', {
+        dirPath: store.settings.uploadPath,
+      })
+      const mapped: SharedFile[] = files.map(f => ({
+        id: `dir-${fileCounter++}`,
+        name: f.name,
+        size: f.size,
+        ip: store.currentIp,
+        path: `${store.settings.uploadPath}/${f.name}`,
+      }))
+      store.setDirectoryFiles(mapped)
+    } catch (e) {
+      console.warn('Failed to list directory:', e)
     }
   }
 
@@ -142,13 +176,13 @@ export function useFileShare() {
         ip: store.currentIp,
         path: `${store.settings.uploadPath}/${info.name}`,
       }
-      store.addFile(file)
+      store.addManualFile(file)
     } catch (e) {
       error.value = String(e)
     }
   }
 
-  async function addFiles(filePaths: string[]) {
+  async function addManualFiles(filePaths: string[]) {
     error.value = ''
     try {
       for (const fp of filePaths) {
@@ -160,21 +194,21 @@ export function useFileShare() {
           ip: store.currentIp,
           path: fp,
         }
-        store.addFile(file)
+        store.addManualFile(file)
       }
     } catch (e) {
       error.value = String(e)
     }
   }
 
-  async function removeFile(file: SharedFile) {
+  async function removeManualFile(file: SharedFile) {
     await safeInvoke('unregister_shared_file', { filename: file.name })
-    store.removeFile(file.id)
+    store.removeManualFile(file.id)
   }
 
-  async function clearFiles() {
+  async function clearManualFiles() {
     await safeInvoke('clear_shared_files_registry')
-    store.clearFiles()
+    store.clearManualFiles()
   }
 
   async function pickFiles() {
@@ -185,9 +219,26 @@ export function useFileShare() {
     if (selected) {
       const paths = Array.isArray(selected) ? selected : [selected]
       if (paths.length > 0) {
-        await addFiles(paths)
+        await addManualFiles(paths)
       }
     }
+  }
+
+  function initDragDrop() {
+    if (!isTauri) return
+    const win = getCurrentWebviewWindow()
+    win.onDragDropEvent((event) => {
+      if (event.payload.type === 'enter') {
+        store.setDragging(true)
+      } else if (event.payload.type === 'leave') {
+        store.setDragging(false)
+      } else if (event.payload.type === 'drop') {
+        store.setDragging(false)
+        if (event.payload.paths.length > 0) {
+          addManualFiles(event.payload.paths)
+        }
+      }
+    })
   }
 
   return {
@@ -199,13 +250,15 @@ export function useFileShare() {
     startServer,
     stopServer,
     refreshLink,
+    refreshDirectoryFiles,
     copyLink,
     copyDownloadLink,
     openFolder,
     shareText,
-    addFiles,
-    removeFile,
-    clearFiles,
+    addManualFiles,
+    removeManualFile,
+    clearManualFiles,
     pickFiles,
+    initDragDrop,
   }
 }
