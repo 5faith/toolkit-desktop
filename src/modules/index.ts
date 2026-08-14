@@ -9,9 +9,8 @@ import liveModule from './flv'
 import encryptModule from './encrypt'
 import exifModule from './exif'
 import fileshareModule from './fileshare'
-import base64Module from './base64'
-import urlModule from './url'
 import shortcutsModule from './shortcuts'
+import encodingModule from './encoding'
 
 const modules: ToolModule[] = [
   formatterModule,
@@ -22,9 +21,8 @@ const modules: ToolModule[] = [
   encryptModule,
   exifModule,
   fileshareModule,
-  base64Module,
-  urlModule,
   shortcutsModule,
+  encodingModule,
 ]
 
 export function registerAllModules() {

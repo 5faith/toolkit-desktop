@@ -1,5 +1,6 @@
 <template>
   <div class="xml-tree" @scroll="onScroll">
+    <div v-if="parseErrorText" class="xml-tree__error">{{ parseErrorText }}</div>
     <div
       v-for="(row, i) in visibleRows"
       :key="row.path"
@@ -64,15 +65,22 @@ const emit = defineEmits<{
   'search-change': [info: { currentIndex: number; totalCount: number }]
 }>()
 
+const parseErrorText = ref('')
+
 const allRows = computed<TreeRow[]>(() => {
+  parseErrorText.value = ''
   if (!props.xmlText) return []
   try {
     const parser = new DOMParser()
     const doc = parser.parseFromString(props.xmlText, 'application/xml')
     const parseError = doc.querySelector('parsererror')
-    if (parseError) return []
+    if (parseError) {
+      parseErrorText.value = parseError.textContent || 'XML parse error'
+      return []
+    }
     return buildFromNode(doc.documentElement, 'root', '', 0)
-  } catch {
+  } catch (e) {
+    parseErrorText.value = String(e)
     return []
   }
 })
@@ -319,4 +327,13 @@ defineExpose({ nextMatch, prevMatch, searchTotal, searchIndex })
 [data-theme="dark"] .xt-tag { color: #c792ea; }
 [data-theme="dark"] .xt-attr-name { color: #ff9d00; }
 [data-theme="dark"] .xt-attr-value { color: #7ec699; }
+
+.xml-tree__error {
+  padding: var(--spacing-md);
+  color: var(--color-error);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
 </style>
