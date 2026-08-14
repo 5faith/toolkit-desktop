@@ -1,5 +1,26 @@
 # toolkit-desktop
-toolkit desktop
+
+A cross-platform desktop utility toolkit built with Tauri 2.0, Vue 3, and Rust.
+
+## Features
+
+| Module | Description |
+|--------|-------------|
+| **Formatter** | Format, compress, and validate JSON, XML, and YAML |
+| **Timestamp Tool** | Convert between timestamps and human-readable dates |
+| **WebSocket Debugger** | Connect to WebSocket servers, send/receive messages, debug protocols |
+| **Text Diff** | Compare two text blocks and highlight differences |
+| **Live Player** | Play RTMP, RTSP, HTTP-FLV, and HLS streams locally via mpv |
+| **Encryption** | Generate UUIDs, compute MD5 hashes, encrypt/decrypt with AES-256 |
+| **Encoding** | HTML formatting, URL/Base64/HTML entity encoding, Image ↔ Base64 conversion |
+
+## Tech Stack
+
+- **Backend:** Rust (Tauri 2.0)
+- **Frontend:** Vue 3 + TypeScript + Vite
+- **UI:** Custom component system with CSS Variables theme (light/dark)
+- **State:** Pinia
+- **Routing:** Vue Router (hash mode)
 
 ## Development
 
@@ -7,17 +28,17 @@ toolkit desktop
 
 - [Node.js](https://nodejs.org/) 18+
 - [Rust](https://www.rust-lang.org/tools/install) (latest stable)
-- [mpv](https://mpv.io/) — **使用 Live Player 功能必须安装**
+- [mpv](https://mpv.io/) — **required for Live Player**
 
-### mpv 安装说明
+### mpv Installation
 
-Live Player 支持 RTMP、RTSP、HTTP-FLV、HLS 等流媒体协议播放，底层依赖 [mpv](https://mpv.io/)。未安装 mpv 时，Live Player 页面会显示提示。
+Live Player supports RTMP, RTSP, HTTP-FLV, HLS and other streaming protocols via [mpv](https://mpv.io/). If mpv is not installed, the Live Player page will show a prompt.
 
 **Windows:**
 
-1. 下载: https://sourceforge.net/projects/mpv-player-windows/files/64bit/
-2. 解压 zip，找到 `mpv.exe`
-3. 将 `mpv.exe` 所在目录添加到系统 PATH 环境变量
+1. Download: https://sourceforge.net/projects/mpv-player-windows/files/64bit/
+2. Extract the zip and find `mpv.exe`
+3. Add the directory containing `mpv.exe` to your system PATH
 
 **macOS:**
 
@@ -31,7 +52,7 @@ brew install mpv
 sudo apt install mpv
 ```
 
-验证安装：
+Verify installation:
 
 ```bash
 mpv --version

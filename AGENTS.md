@@ -2,16 +2,17 @@
 
 ## 项目概述
 
-基于 **Tauri 2.0** 的桌面日常工具集，当前包含 6 个工具模块：
+基于 **Tauri 2.0** 的桌面日常工具集，当前包含 7 个工具模块：
 
 | 模块 | 说明 |
 |------|------|
-| JSON / XML Formatter | JSON 和 XML 的格式化、压缩、校验 |
+| Formatter | JSON / XML / YAML 的格式化、压缩、校验 |
 | Timestamp Tool | 时间戳与日期互转 |
 | WebSocket Debugger | WebSocket 连接、消息收发、协议调试 |
 | Text Diff | 两段文本的差异对比 |
 | Live Player | RTMP/RTSP/FLV 流媒体本地播放器 |
 | Encryption | UUID 生成、MD5 哈希、AES-256 加解密 |
+| Encoding | HTML 格式化、URL/Base64/HTML Entities 编解码、Image ↔ Base64 |
 
 ---
 
@@ -174,6 +175,14 @@ toolkit-desktop/
 │           │   └── EncryptView.vue
 │           └── composables/
 │               └── useEncrypt.ts  # UUID, MD5, AES-256-CBC (Web Crypto API)
+│
+│       └── encoding/
+│           ├── index.ts
+│           ├── meta.ts           # { id: 'encoding', name: 'Encoding', icon: '🔄', shortcut: 'Ctrl+9' }
+│           ├── components/
+│           │   └── EncodingView.vue  # 3 tabs: HTML, Encode, Image
+│           └── composables/
+│               └── useEncodingTool.ts # HTML format, entities, URL, Base64, Image↔Base64
 │
 ├── public/
 │   └── icons/                    # SVG 图标
