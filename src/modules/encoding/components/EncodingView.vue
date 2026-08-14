@@ -208,7 +208,7 @@ function doHtmlFormat() {
 
 function doHtmlEncode() {
   try {
-    htmlOutput.value = encodeHtmlEntities(htmlInput.value)
+    htmlInput.value = encodeHtmlEntities(htmlInput.value)
     error.value = ''
   } catch (e) {
     error.value = String(e)
@@ -217,7 +217,7 @@ function doHtmlEncode() {
 
 function doHtmlDecode() {
   try {
-    htmlOutput.value = decodeHtmlEntities(htmlInput.value)
+    htmlInput.value = decodeHtmlEntities(htmlInput.value)
     error.value = ''
   } catch (e) {
     error.value = String(e)
