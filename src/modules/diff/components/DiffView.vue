@@ -31,29 +31,43 @@
       </div>
     </div>
 
-    <div v-if="lineDiff.length > 0" class="diff-view__result">
+    <div v-if="alignedLines.length > 0" class="diff-view__result">
       <div class="panel-header">Diff Result</div>
 
       <div v-if="store.viewMode === 'side-by-side'" class="diff-side">
         <div class="diff-side__panel">
-          <div class="diff-side__scroll">
+          <div
+            ref="leftScrollRef"
+            class="diff-side__scroll"
+            @scroll="syncScroll('left')"
+          >
             <div
               v-for="(line, i) in leftLines"
               :key="'l' + i"
               class="diff-line"
-              :class="{ 'diff-line--removed': line.type === 'removed' }"
+              :class="{
+                'diff-line--removed': line.type === 'removed',
+                'diff-line--padding': line.type === 'padding',
+              }"
             >
               <pre class="diff-line__text">{{ line.text }}</pre>
             </div>
           </div>
         </div>
         <div class="diff-side__panel">
-          <div class="diff-side__scroll">
+          <div
+            ref="rightScrollRef"
+            class="diff-side__scroll"
+            @scroll="syncScroll('right')"
+          >
             <div
               v-for="(line, i) in rightLines"
               :key="'r' + i"
               class="diff-line"
-              :class="{ 'diff-line--added': line.type === 'added' }"
+              :class="{
+                'diff-line--added': line.type === 'added',
+                'diff-line--padding': line.type === 'padding',
+              }"
             >
               <pre class="diff-line__text">{{ line.text }}</pre>
             </div>
@@ -93,46 +107,67 @@ const lineDiff = ref<Change[]>([])
 
 interface DiffLine {
   text: string
-  type: 'added' | 'removed' | 'unchanged'
+  type: 'added' | 'removed' | 'unchanged' | 'padding'
 }
 
-const leftLines = computed<DiffLine[]>(() => {
-  const result: DiffLine[] = []
+interface AlignedPair {
+  left: DiffLine
+  right: DiffLine
+}
+
+const alignedLines = computed<AlignedPair[]>(() => {
+  const pairs: AlignedPair[] = []
   for (const change of lineDiff.value) {
     const lines = change.value.split('\n')
     if (change.removed) {
       for (const line of lines) {
-        result.push({ text: line, type: 'removed' })
+        pairs.push({
+          left: { text: line, type: 'removed' },
+          right: { text: '', type: 'padding' },
+        })
       }
-    } else if (!change.added) {
+    } else if (change.added) {
       for (const line of lines) {
-        result.push({ text: line, type: 'unchanged' })
+        pairs.push({
+          left: { text: '', type: 'padding' },
+          right: { text: line, type: 'added' },
+        })
+      }
+    } else {
+      for (const line of lines) {
+        pairs.push({
+          left: { text: line, type: 'unchanged' },
+          right: { text: line, type: 'unchanged' },
+        })
       }
     }
   }
-  return result
+  return pairs
 })
 
-const rightLines = computed<DiffLine[]>(() => {
-  const result: DiffLine[] = []
-  for (const change of lineDiff.value) {
-    const lines = change.value.split('\n')
-    if (change.added) {
-      for (const line of lines) {
-        result.push({ text: line, type: 'added' })
-      }
-    } else if (!change.removed) {
-      for (const line of lines) {
-        result.push({ text: line, type: 'unchanged' })
-      }
-    }
-  }
-  return result
-})
+const leftLines = computed<DiffLine[]>(() => alignedLines.value.map((p) => p.left))
+const rightLines = computed<DiffLine[]>(() => alignedLines.value.map((p) => p.right))
 
 function computeDiff() {
   doCompute()
   lineDiff.value = computeLineDiff()
+}
+
+const leftScrollRef = ref<HTMLDivElement>()
+const rightScrollRef = ref<HTMLDivElement>()
+let syncing = false
+
+function syncScroll(source: 'left' | 'right') {
+  if (syncing) return
+  syncing = true
+  requestAnimationFrame(() => {
+    const sourceEl = source === 'left' ? leftScrollRef.value : rightScrollRef.value
+    const targetEl = source === 'left' ? rightScrollRef.value : leftScrollRef.value
+    if (sourceEl && targetEl) {
+      targetEl.scrollTop = sourceEl.scrollTop
+    }
+    syncing = false
+  })
 }
 </script>
 
@@ -271,6 +306,11 @@ function computeDiff() {
 .diff-line--removed {
   background: #fee2e2;
   color: #991b1b;
+}
+
+.diff-line--padding {
+  background: var(--color-bg-secondary);
+  min-height: 1.5em;
 }
 
 [data-theme="dark"] .diff-line--added {
