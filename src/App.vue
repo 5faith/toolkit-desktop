@@ -1,5 +1,9 @@
 <template>
-  <ToolShell :sidebar-collapsed="appStore.sidebarCollapsed" :live-mode="appStore.activeModuleId === 'live'">
+  <ToolShell
+    :sidebar-collapsed="appStore.sidebarCollapsed"
+    :live-mode="isLive"
+    :live-matte-style="liveMatteStyle"
+  >
     <template #sidebar>
       <div class="sidebar">
         <div v-if="!appStore.sidebarCollapsed" class="sidebar__brand">
@@ -46,7 +50,7 @@
       </div>
     </template>
 
-    <div class="app-content" :class="{ 'app-content--live': appStore.activeModuleId === 'live' }">
+    <div class="app-content">
       <TabBar
         :tabs="openedModules"
         :active-id="appStore.activeModuleId"
@@ -58,8 +62,12 @@
 
       <div
         v-show="appStore.openTabs.length > 0"
+        ref="viewWrapRef"
         class="app-content__view"
-        :class="{ 'app-content__view--plain': activeModule?.card === false }"
+        :class="{
+          'app-content__view--plain': activeModule?.card === false,
+          'app-content__view--live': isLive,
+        }"
       >
         <router-view v-slot="{ Component }">
           <keep-alive :include="cachedNames">
@@ -86,7 +94,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import ToolShell from '@shared/components/ToolShell.vue'
 import StatusBar from '@shared/components/StatusBar.vue'
@@ -119,6 +127,73 @@ const openedModules = computed(() =>
     .map(id => allModules.value.find(m => m.id === id))
     .filter((m): m is ToolModule => m !== undefined)
 )
+
+const isLive = computed(() => appStore.activeModuleId === 'live')
+
+/*
+ * Live 视频垫在 WebView 之下，只有页面透明处可见。 live 模式保留正常卡片间隙，
+ * 但间隙下的画布由 ToolShell 的 matte 提供；这里测量视图容器的位置，在 matte 上
+ * 抠出一个圆角"洞"正对视频卡片，视频从洞中透出，间隙仍是画布色。
+ */
+const viewWrapRef = ref<HTMLElement | null>(null)
+const liveHole = ref<{ x: number; y: number; w: number; h: number } | null>(null)
+let liveResizeObserver: ResizeObserver | null = null
+
+function measureLiveHole() {
+  const el = viewWrapRef.value
+  if (!isLive.value || !el) {
+    liveHole.value = null
+    return
+  }
+  const rect = el.getBoundingClientRect()
+  liveHole.value = rect.width > 2 && rect.height > 2
+    ? { x: rect.left, y: rect.top, w: rect.width, h: rect.height }
+    : null
+}
+
+watch(isLive, live => {
+  if (live) {
+    nextTick(() => {
+      measureLiveHole()
+      const el = viewWrapRef.value
+      if (el && !liveResizeObserver) {
+        liveResizeObserver = new ResizeObserver(measureLiveHole)
+        liveResizeObserver.observe(el)
+      }
+    })
+  } else {
+    liveResizeObserver?.disconnect()
+    liveResizeObserver = null
+    liveHole.value = null
+  }
+})
+
+const liveMatteStyle = computed(() => {
+  const hole = liveHole.value
+  if (!hole) return undefined
+  const n = (v: number) => Math.round(v * 100) / 100
+  const outer = `M0 0H${window.innerWidth}V${window.innerHeight}H0Z`
+  const x = n(hole.x + 1)
+  const y = n(hole.y + 1)
+  const w = n(hole.w - 2)
+  const h = n(hole.h - 2)
+  const r = Math.min(11, w / 2 - 1, h / 2 - 1)
+  let inner: string
+  if (r < 1) {
+    inner = `M${x + w} ${y}H${x}V${y + h}H${x + w}Z`
+  } else {
+    inner =
+      `M${n(x + w - r)} ${y}H${n(x + r)}` +
+      `A${n(r)} ${n(r)} 0 0 0 ${x} ${n(y + r)}` +
+      `V${n(y + h - r)}` +
+      `A${n(r)} ${n(r)} 0 0 0 ${n(x + r)} ${n(y + h)}` +
+      `H${n(x + w - r)}` +
+      `A${n(r)} ${n(r)} 0 0 0 ${x + w} ${n(y + h - r)}` +
+      `V${n(y + r)}` +
+      `A${n(r)} ${n(r)} 0 0 0 ${n(x + w - r)} ${y}Z`
+  }
+  return { clipPath: `path("${outer}${inner}")` }
+})
 
 const cachedNames = computed(() =>
   allModules.value
@@ -324,18 +399,6 @@ onMounted(async () => {
   min-height: 0;
 }
 
-/* live 模式：视频垫在 WebView 之下，TabBar 与视频区之间不能留透明缝 */
-.app-content--live {
-  gap: 0;
-}
-
-.app-content--live :deep(.tab-bar) {
-  border-radius: 0;
-  border-left: none;
-  border-right: none;
-  border-top: none;
-}
-
 .app-content__view {
   flex: 1;
   min-height: 0;
@@ -351,6 +414,14 @@ onMounted(async () => {
   border: none;
   border-radius: 0;
   box-shadow: none;
+}
+
+/* live：视图卡片背景保持透明（视频从 matte 的洞透出），但保留卡片边框与圆角 */
+.app-content__view--live {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
 }
 
 .app-content__empty {
