@@ -974,6 +974,31 @@ pub fn read_image_exif_bytes(data: Vec<u8>) -> Result<ExifData, String> {
     parse_exif_bytes(&data)
 }
 
+/// Decode formats the WebView cannot render (TIFF) into a PNG data URL.
+/// Returns None for renderable formats or on decode failure; the frontend
+/// then falls back to its own placeholder.
+#[tauri::command]
+pub fn decode_image_preview(data: Vec<u8>, ext: String) -> Option<String> {
+    const PREVIEW_DECODE_EXTENSIONS: [&str; 2] = ["tif", "tiff"];
+    if !PREVIEW_DECODE_EXTENSIONS.contains(&ext.to_lowercase().as_str()) {
+        return None;
+    }
+
+    let img = image::load_from_memory(&data).ok()?;
+    let resized = img.thumbnail(2048, 2048);
+
+    let mut png = std::io::Cursor::new(Vec::new());
+    resized
+        .write_to(&mut png, image::ImageFormat::Png)
+        .ok()?;
+
+    use base64::Engine as _;
+    Some(format!(
+        "data:image/png;base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(png.into_inner())
+    ))
+}
+
 fn parse_exif_bytes(raw_bytes: &[u8]) -> Result<ExifData, String> {
     let mut buf_reader = BufReader::new(std::io::Cursor::new(raw_bytes));
     let exif_reader = Reader::new();
@@ -1104,5 +1129,62 @@ mod tests {
                 .iter()
                 .any(|f| f.tag == "Make" && f.value == "TestCam")
         );
+    }
+
+    fn u16le_bytes(v: u16) -> Vec<u8> {
+        v.to_le_bytes().to_vec()
+    }
+
+    fn u32le_bytes(v: u32) -> Vec<u8> {
+        v.to_le_bytes().to_vec()
+    }
+
+    /// A 1x1 uncompressed RGB TIFF the `image` crate can decode
+    fn build_minimal_rgb_tiff() -> Vec<u8> {
+        let entry = |tag: u16, typ: u16, count: u32, value: u32| -> Vec<u8> {
+            let mut e = Vec::new();
+            e.extend_from_slice(&tag.to_le_bytes());
+            e.extend_from_slice(&typ.to_le_bytes());
+            e.extend_from_slice(&count.to_le_bytes());
+            e.extend_from_slice(&value.to_le_bytes());
+            e
+        };
+
+        let mut buf = Vec::new();
+        buf.extend_from_slice(b"II");
+        buf.extend(u16le_bytes(42)); // magic
+        buf.extend(u32le_bytes(8)); // IFD0 at offset 8
+        buf.extend(u16le_bytes(9)); // entry count
+        buf.extend(entry(256, 3, 1, 1)); // ImageWidth = 1
+        buf.extend(entry(257, 3, 1, 1)); // ImageLength = 1
+        buf.extend(entry(258, 3, 3, 122)); // BitsPerSample = [8, 8, 8] at 122
+        buf.extend(entry(259, 3, 1, 1)); // Compression = none
+        buf.extend(entry(262, 3, 1, 2)); // Photometric = RGB
+        buf.extend(entry(273, 4, 1, 128)); // StripOffsets = 128
+        buf.extend(entry(277, 3, 1, 3)); // SamplesPerPixel = 3
+        buf.extend(entry(278, 3, 1, 1)); // RowsPerStrip = 1
+        buf.extend(entry(279, 4, 1, 3)); // StripByteCounts = 3
+        buf.extend(u32le_bytes(0)); // no next IFD
+        assert_eq!(buf.len(), 122);
+        buf.extend(u16le_bytes(8)); // BitsPerSample[0]
+        buf.extend(u16le_bytes(8)); // BitsPerSample[1]
+        buf.extend(u16le_bytes(8)); // BitsPerSample[2]
+        buf.extend_from_slice(&[255, 128, 64]); // one RGB pixel
+        buf
+    }
+
+    #[test]
+    fn decodes_tiff_preview_to_png_data_url() {
+        let preview = decode_image_preview(build_minimal_rgb_tiff(), "tif".to_string())
+            .expect("TIFF preview should decode");
+        assert!(preview.starts_with("data:image/png;base64,"));
+
+        // renderable formats are left to the webview
+        assert_eq!(
+            decode_image_preview(build_minimal_rgb_tiff(), "jpg".to_string()),
+            None
+        );
+        // broken TIFF data falls back gracefully
+        assert_eq!(decode_image_preview(vec![0x49, 0x49, 0x2A, 0x00, 1], "tif".to_string()), None);
     }
 }

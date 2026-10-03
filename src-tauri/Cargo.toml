@@ -27,4 +27,6 @@ tauri-plugin-store = "2"
 tauri-plugin-dialog = "2"
 mime_guess = "2"
 kamadak-exif = "0.5"
+base64 = "0.22"
+image = { version = "0.25", default-features = false, features = ["tiff", "png"] }
 tauri-plugin-mpv = { git = "https://github.com/nini22P/tauri-plugin-mpv" }
