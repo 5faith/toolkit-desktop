@@ -16,6 +16,7 @@ pub fn run() {
             commands::timestamp::convert_timestamp,
             commands::diff::compute_diff,
             commands::exif::read_image_exif,
+            commands::exif::read_image_exif_bytes,
             commands::flv::read_local_file,
             commands::fileshare::start_file_share,
             commands::fileshare::stop_file_share,

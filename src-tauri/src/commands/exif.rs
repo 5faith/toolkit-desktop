@@ -3,9 +3,7 @@ use quick_xml::Reader as XmlReader;
 use quick_xml::events::Event;
 use serde::Serialize;
 use std::collections::HashMap;
-use std::fs::File;
 use std::io::BufReader;
-use std::path::Path;
 
 #[derive(Serialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -931,8 +929,18 @@ fn parse_icc_profile(data: &[u8]) -> Vec<ExifField> {
 
 #[tauri::command]
 pub fn read_image_exif(path: &str) -> Result<ExifData, String> {
-    let file = File::open(Path::new(path)).map_err(|e| e.to_string())?;
-    let mut buf_reader = BufReader::new(file);
+    let raw_bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+    parse_exif_bytes(&raw_bytes)
+}
+
+/// Parse EXIF from in-memory image bytes (drag-drop passes no real file path)
+#[tauri::command]
+pub fn read_image_exif_bytes(data: Vec<u8>) -> Result<ExifData, String> {
+    parse_exif_bytes(&data)
+}
+
+fn parse_exif_bytes(raw_bytes: &[u8]) -> Result<ExifData, String> {
+    let mut buf_reader = BufReader::new(std::io::Cursor::new(raw_bytes));
     let exif_reader = Reader::new();
     let exif = exif_reader
         .read_from_container(&mut buf_reader)
@@ -1000,8 +1008,7 @@ pub fn read_image_exif(path: &str) -> Result<ExifData, String> {
     all_fields.sort_by(|a, b| a.tag.cmp(&b.tag));
     data.all_fields = all_fields;
 
-    let raw_bytes = std::fs::read(path).map_err(|e| e.to_string())?;
-    let metadata = extract_metadata(&raw_bytes);
+    let metadata = extract_metadata(raw_bytes);
 
     if let Some(ref xmp_data) = metadata.xmp_raw {
         data.xmp_fields = parse_xmp(xmp_data);

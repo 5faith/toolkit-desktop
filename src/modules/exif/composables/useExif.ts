@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
 import { useExifStore, type ExifData } from '../store'
 
-const SUPPORTED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'avif']
+export const SUPPORTED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'avif']
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
@@ -28,7 +28,10 @@ export function useExif() {
       avif: 'image/avif',
     }
     const mime = mimeMap[ext] || 'image/jpeg'
-    const blob = new Blob([uint8], { type: mime })
+    return blobToDataUrl(new Blob([uint8], { type: mime }))
+  }
+
+  function blobToDataUrl(blob: Blob): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.onload = () => resolve(reader.result as string)
@@ -54,6 +57,33 @@ export function useExif() {
       store.setImage(path, name, size, src)
 
       const data = await invoke<ExifData>('read_image_exif', { path })
+      store.setExifData(data)
+    } catch (e) {
+      store.setError(String(e))
+    } finally {
+      store.setLoading(false)
+    }
+  }
+
+  /**
+   * Handle a File dropped via HTML5 drag events (used when the window runs
+   * with dragDropEnabled = false or in the browser; no real path available).
+   * Bytes are sent to the backend so EXIF is parsed the same way as path-based imports.
+   */
+  async function processDroppedFile(file: File) {
+    store.setLoading(true)
+    store.setError('')
+
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase() || ''
+      if (!SUPPORTED_EXTENSIONS.includes(ext)) {
+        throw new Error(`Unsupported format: .${ext}`)
+      }
+      const data = await invoke<ExifData>('read_image_exif_bytes', {
+        data: new Uint8Array(await file.arrayBuffer()),
+      })
+      const src = await blobToDataUrl(file)
+      store.setImage('', file.name, file.size, src)
       store.setExifData(data)
     } catch (e) {
       store.setError(String(e))
@@ -89,6 +119,7 @@ export function useExif() {
   return {
     pickFile,
     processFile,
+    processDroppedFile,
     clearAll,
     formatSize,
   }

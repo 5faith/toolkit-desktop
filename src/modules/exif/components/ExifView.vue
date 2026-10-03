@@ -21,9 +21,17 @@
     </div>
 
     <div
+      ref="dropZoneRef"
       class="exif-view__drop-zone"
-      :class="{ 'exif-view__drop-zone--active': store.fileSrc }"
+      :class="{
+        'exif-view__drop-zone--active': store.fileSrc,
+        'exif-view__drop-zone--dragging': dragging,
+      }"
     >
+      <div v-if="dragging" class="exif-view__drag-overlay">
+        <span class="drag-overlay__text">释放以导入图片</span>
+      </div>
+
       <div v-if="store.loading" class="exif-view__loading-overlay">
         <div class="loading-spinner" />
         <span class="loading-text">正在解析元数据...</span>
@@ -40,6 +48,7 @@
           </div>
           <p class="drop-zone__text">拖拽图片到此处，或点击选择</p>
           <p class="drop-zone__hint">支持 JPG、PNG、WebP、HEIC、AVIF 格式</p>
+          <p v-if="store.error" class="drop-zone__error">{{ store.error }}</p>
         </div>
       </template>
 
@@ -149,12 +158,43 @@
 defineOptions({ name: 'ExifView' })
 import { computed, ref } from 'vue'
 import { useExifStore } from '../store'
-import { useExif } from '../composables/useExif'
+import { useExif, SUPPORTED_EXTENSIONS } from '../composables/useExif'
+import { useFileDrop } from '@shared/composables/useFileDrop'
 
 const store = useExifStore()
-const { pickFile, processFile, clearAll, formatSize } = useExif()
+const { pickFile, processFile, processDroppedFile, clearAll, formatSize } = useExif()
 
 const filePathInput = ref('')
+
+const dropZoneRef = ref<HTMLElement | null>(null)
+const { dragging } = useFileDrop({
+  target: dropZoneRef,
+  onDropPaths: handleDroppedPaths,
+  onDropFiles: handleDroppedFiles,
+})
+
+function isSupportedName(name: string): boolean {
+  const ext = name.split('.').pop()?.toLowerCase() || ''
+  return SUPPORTED_EXTENSIONS.includes(ext)
+}
+
+async function handleDroppedPaths(paths: string[]) {
+  const image = paths.find(isSupportedName)
+  if (!image) {
+    store.setError('不支持的文件格式，请拖入 JPG / PNG / WebP / HEIC / AVIF 图片')
+    return
+  }
+  await processFile(image)
+}
+
+async function handleDroppedFiles(files: File[]) {
+  const file = files.find(f => isSupportedName(f.name))
+  if (!file) {
+    store.setError('不支持的文件格式，请拖入 JPG / PNG / WebP / HEIC / AVIF 图片')
+    return
+  }
+  await processDroppedFile(file)
+}
 
 async function importByPath() {
   const path = filePathInput.value.trim()
@@ -377,6 +417,41 @@ function downloadFile(content: string, filename: string, mimeType: string) {
   flex: 1;
   overflow: auto;
   position: relative;
+}
+
+.exif-view__drop-zone--dragging {
+  outline: 2px dashed var(--color-accent);
+  outline-offset: -10px;
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+
+.exif-view__drag-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--color-bg-primary) 55%, transparent);
+}
+
+.drag-overlay__text {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border: 2px dashed var(--color-accent);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-primary);
+  color: var(--color-accent);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.drop-zone__error {
+  margin-top: var(--spacing-sm);
+  max-width: 480px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--color-error);
 }
 
 .drop-zone__content {
