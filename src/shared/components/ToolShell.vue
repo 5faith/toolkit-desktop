@@ -1,5 +1,5 @@
 <template>
-  <div class="tool-shell" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+  <div class="tool-shell" :class="{ 'sidebar-collapsed': sidebarCollapsed, 'tool-shell--live': liveMode }">
     <div class="tool-shell__body">
       <aside class="tool-shell__sidebar">
         <slot name="sidebar" />
@@ -67,6 +67,33 @@ defineProps<{
 
 .tool-shell__content--live {
   background: transparent;
+}
+
+/*
+ * mpv (--wid) renders BEHIND the webview and shows through transparent
+ * regions only, so the live layout must go full-bleed: no canvas padding,
+ * no card gaps — otherwise the opaque shell hides the video entirely.
+ */
+.tool-shell--live {
+  padding: 0;
+  gap: 0;
+  background: transparent;
+}
+
+.tool-shell--live .tool-shell__body {
+  gap: 0;
+}
+
+.tool-shell--live .tool-shell__sidebar {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.tool-shell--live .tool-shell__statusbar {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .tool-shell__statusbar {

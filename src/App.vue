@@ -46,7 +46,7 @@
       </div>
     </template>
 
-    <div class="app-content">
+    <div class="app-content" :class="{ 'app-content--live': appStore.activeModuleId === 'live' }">
       <TabBar
         :tabs="openedModules"
         :active-id="appStore.activeModuleId"
@@ -322,6 +322,18 @@ onMounted(async () => {
   gap: var(--spacing-sm);
   height: 100%;
   min-height: 0;
+}
+
+/* live 模式：视频垫在 WebView 之下，TabBar 与视频区之间不能留透明缝 */
+.app-content--live {
+  gap: 0;
+}
+
+.app-content--live :deep(.tab-bar) {
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  border-top: none;
 }
 
 .app-content__view {
