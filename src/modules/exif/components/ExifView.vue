@@ -47,7 +47,7 @@
             </svg>
           </div>
           <p class="drop-zone__text">拖拽图片到此处，或点击选择</p>
-          <p class="drop-zone__hint">支持 JPG、PNG、WebP、HEIC、AVIF 格式</p>
+          <p class="drop-zone__hint">支持 JPG、PNG、WebP、TIFF、HEIC、AVIF 格式</p>
           <p v-if="store.error" class="drop-zone__error">{{ store.error }}</p>
         </div>
       </template>
@@ -55,7 +55,16 @@
       <template v-else>
         <div class="exif-view__result">
           <div class="exif-view__image-panel">
-            <img :src="store.fileSrc" class="exif-view__image" />
+            <img
+              v-if="!imgFailed"
+              :src="store.fileSrc"
+              class="exif-view__image"
+              @error="imgFailed = true"
+            />
+            <div v-else class="exif-view__image-fallback">
+              <span class="image-fallback__icon">🖼</span>
+              <span class="image-fallback__text">此格式无法预览，元数据已解析</span>
+            </div>
             <div class="exif-view__file-info">
               <span class="file-info__name">{{ store.fileName }}</span>
               <span class="file-info__size">{{ formatSize(store.fileSize) }}</span>
@@ -156,7 +165,7 @@
 <script setup lang="ts">
 
 defineOptions({ name: 'ExifView' })
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useExifStore } from '../store'
 import { useExif, SUPPORTED_EXTENSIONS } from '../composables/useExif'
 import { useFileDrop } from '@shared/composables/useFileDrop'
@@ -165,6 +174,12 @@ const store = useExifStore()
 const { pickFile, processFile, processDroppedFile, clearAll, formatSize } = useExif()
 
 const filePathInput = ref('')
+
+/** TIFF / HEIC 等格式 WebView 无法渲染，@error 后降级为占位框 */
+const imgFailed = ref(false)
+watch(() => store.fileSrc, () => {
+  imgFailed.value = false
+})
 
 const dropZoneRef = ref<HTMLElement | null>(null)
 const { dragging } = useFileDrop({
@@ -498,6 +513,26 @@ function downloadFile(content: string, filename: string, mimeType: string) {
   object-fit: contain;
   border-radius: var(--radius-md);
   background: var(--color-bg-secondary);
+}
+
+.exif-view__image-fallback {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-secondary);
+}
+
+.image-fallback__icon {
+  font-size: 40px;
+}
+
+.image-fallback__text {
+  font-size: 12.5px;
+  color: var(--color-text-tertiary);
 }
 
 .exif-view__file-info {

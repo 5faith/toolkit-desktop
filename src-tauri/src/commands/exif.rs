@@ -1,4 +1,4 @@
-use exif::{Reader, Tag};
+use exif::{Context, Reader, Tag};
 use quick_xml::Reader as XmlReader;
 use quick_xml::events::Event;
 use serde::Serialize;
@@ -73,6 +73,8 @@ fn gps_to_dms(val_str: &str, ref_val: &str) -> String {
 fn get_display(exif: &exif::Exif, tag: Tag) -> Option<String> {
     exif.get_field(tag, exif::In::PRIMARY)
         .map(|f| f.display_value().to_string())
+        // display_value wraps ASCII values in quotes
+        .map(|s| s.trim_matches('"').to_string())
 }
 
 fn clean_tag_name(raw: &str) -> String {
@@ -339,6 +341,39 @@ fn extract_metadata(data: &[u8]) -> RawMetadata {
         iptc_raw: None,
         icc_raw: None,
     }
+}
+
+fn is_tiff_container(data: &[u8]) -> bool {
+    data.len() >= 4
+        && (data[..4] == [0x49, 0x49, 0x2A, 0x00] || data[..4] == [0x4D, 0x4D, 0x00, 0x2A])
+}
+
+fn field_bytes(value: &exif::Value) -> Option<Vec<u8>> {
+    match value {
+        exif::Value::Byte(v) => Some(v.clone()),
+        exif::Value::Undefined(v, _) => Some(v.clone()),
+        _ => None,
+    }
+}
+
+/// In TIFF containers XMP / IPTC / ICC live in IFD0 tags instead of dedicated segments
+fn extract_tiff_metadata(exif: &exif::Exif) -> RawMetadata {
+    let mut result = RawMetadata {
+        xmp_raw: None,
+        iptc_raw: None,
+        icc_raw: None,
+    };
+
+    for field in exif.fields() {
+        match field.tag {
+            Tag(Context::Tiff, 0x02BC) => result.xmp_raw = field_bytes(&field.value),
+            Tag(Context::Tiff, 0x83BB) => result.iptc_raw = field_bytes(&field.value),
+            Tag(Context::Tiff, 0x8773) => result.icc_raw = field_bytes(&field.value),
+            _ => {}
+        }
+    }
+
+    result
 }
 
 const IPTC_TAG_NAMES: &[(u8, u8, &str)] = &[
@@ -999,7 +1034,7 @@ fn parse_exif_bytes(raw_bytes: &[u8]) -> Result<ExifData, String> {
         total += 1;
         let tag_name = clean_tag_name(&field.tag.to_string());
         let raw = field.display_value().to_string();
-        let val = decode_value(&raw);
+        let val = decode_value(raw.trim_matches('"'));
         all_fields.push(ExifField {
             tag: tag_name,
             value: val,
@@ -1008,7 +1043,11 @@ fn parse_exif_bytes(raw_bytes: &[u8]) -> Result<ExifData, String> {
     all_fields.sort_by(|a, b| a.tag.cmp(&b.tag));
     data.all_fields = all_fields;
 
-    let metadata = extract_metadata(raw_bytes);
+    let metadata = if is_tiff_container(raw_bytes) {
+        extract_tiff_metadata(&exif)
+    } else {
+        extract_metadata(raw_bytes)
+    };
 
     if let Some(ref xmp_data) = metadata.xmp_raw {
         data.xmp_fields = parse_xmp(xmp_data);
@@ -1028,4 +1067,42 @@ fn parse_exif_bytes(raw_bytes: &[u8]) -> Result<ExifData, String> {
     data.total_tags = total;
 
     Ok(data)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn build_minimal_tiff() -> Vec<u8> {
+        let mut buf: Vec<u8> = Vec::new();
+        buf.extend_from_slice(&[0x49, 0x49, 0x2A, 0x00]); // "II*\0" little-endian TIFF
+        buf.extend_from_slice(&8u32.to_le_bytes()); // IFD0 offset
+        buf.extend_from_slice(&2u16.to_le_bytes()); // entry count
+        // entry 1: Make (0x010F), ASCII, 8 bytes at offset 38
+        buf.extend_from_slice(&0x010Fu16.to_le_bytes());
+        buf.extend_from_slice(&2u16.to_le_bytes());
+        buf.extend_from_slice(&8u32.to_le_bytes());
+        buf.extend_from_slice(&38u32.to_le_bytes());
+        // entry 2: XMP packet (0x02BC), UNDEFINED, 4 bytes inline
+        buf.extend_from_slice(&0x02BCu16.to_le_bytes());
+        buf.extend_from_slice(&7u16.to_le_bytes());
+        buf.extend_from_slice(&4u32.to_le_bytes());
+        buf.extend_from_slice(b"xmp!");
+        buf.extend_from_slice(&0u32.to_le_bytes()); // no next IFD
+        buf.extend_from_slice(b"TestCam\0");
+        buf
+    }
+
+    #[test]
+    fn parses_tiff_container_exif_and_xmp_tag() {
+        let data = build_minimal_tiff();
+        let result = parse_exif_bytes(&data).expect("TIFF should parse");
+        assert_eq!(result.camera_make.as_deref(), Some("TestCam"));
+        assert!(
+            result
+                .all_fields
+                .iter()
+                .any(|f| f.tag == "Make" && f.value == "TestCam")
+        );
+    }
 }

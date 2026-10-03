@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
 import { useExifStore, type ExifData } from '../store'
 
-export const SUPPORTED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'avif']
+export const SUPPORTED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'tif', 'tiff', 'heic', 'avif']
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
@@ -24,6 +24,8 @@ export function useExif() {
       jpeg: 'image/jpeg',
       png: 'image/png',
       webp: 'image/webp',
+      tif: 'image/tiff',
+      tiff: 'image/tiff',
       heic: 'image/heic',
       avif: 'image/avif',
     }
