@@ -25,24 +25,33 @@ defineProps<{
 .tool-shell {
   display: flex;
   flex-direction: column;
+  gap: var(--spacing-sm);
   height: 100vh;
   width: 100vw;
+  padding: var(--spacing-sm);
+  box-sizing: border-box;
   overflow: hidden;
+  background: var(--color-bg-secondary);
 }
 
 .tool-shell__body {
   display: flex;
+  gap: var(--spacing-sm);
   flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
 .tool-shell__sidebar {
   width: var(--sidebar-width);
-  border-right: 1px solid var(--color-border);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  background: var(--color-bg-primary);
   overflow-y: auto;
+  overflow-x: hidden;
   flex-shrink: 0;
   transition: width 0.2s ease;
-  background: var(--color-bg-primary);
 }
 
 .sidebar-collapsed .tool-shell__sidebar {
@@ -51,6 +60,7 @@ defineProps<{
 
 .tool-shell__content {
   flex: 1;
+  min-width: 0;
   overflow: auto;
   background: var(--color-bg-secondary);
 }
@@ -61,8 +71,11 @@ defineProps<{
 
 .tool-shell__statusbar {
   height: var(--statusbar-height);
-  border-top: 1px solid var(--color-border);
-  flex-shrink: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-sm);
   background: var(--color-bg-primary);
+  overflow: hidden;
+  flex-shrink: 0;
 }
 </style>

@@ -61,6 +61,8 @@
 </template>
 
 <script setup lang="ts">
+
+defineOptions({ name: 'WebsocketView' })
 import { ref, nextTick, watch } from 'vue'
 import { useWebsocketStore } from '../store'
 import { useWebSocket } from '../composables/useWebSocket'

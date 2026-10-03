@@ -53,6 +53,8 @@
 </template>
 
 <script setup lang="ts">
+
+defineOptions({ name: 'TimestampView' })
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useTimestampStore } from '../store'
 import { useTimestamp } from '../composables/useTimestamp'

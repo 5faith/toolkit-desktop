@@ -134,6 +134,8 @@
 </template>
 
 <script setup lang="ts">
+
+defineOptions({ name: 'EncodingView' })
 import { ref, computed } from 'vue'
 import CodeEditor from '@shared/components/CodeEditor.vue'
 import { useClipboard } from '@shared/composables/useClipboard'

@@ -111,6 +111,8 @@
 </template>
 
 <script setup lang="ts">
+
+defineOptions({ name: 'FlvPlayerView' })
 import { ref, onMounted } from 'vue'
 import { useLiveStore } from '../store'
 import { useLivePlayer } from '../composables/useFlvPlayer'

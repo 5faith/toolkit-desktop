@@ -7,7 +7,10 @@
       ref="textareaRef"
       :value="modelValue"
       class="code-editor__textarea"
-      :class="{ 'code-editor__textarea--with-lines': showLineNumbers }"
+      :class="{
+        'code-editor__textarea--with-lines': showLineNumbers,
+        'code-editor__textarea--nowrap': wrap === false,
+      }"
       :placeholder="placeholder"
       :readonly="readonly"
       spellcheck="false"
@@ -25,6 +28,8 @@ const props = defineProps<{
   placeholder?: string
   readonly?: boolean
   showLineNumbers?: boolean
+  /** soft-wrap long lines (default true) */
+  wrap?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -107,6 +112,13 @@ defineExpose({ textareaRef })
 
 .code-editor__textarea--with-lines {
   padding-left: var(--spacing-sm);
+}
+
+.code-editor__textarea--nowrap {
+  white-space: pre;
+  overflow-x: auto;
+  word-wrap: normal;
+  overflow-wrap: normal;
 }
 
 .code-editor__textarea::placeholder {

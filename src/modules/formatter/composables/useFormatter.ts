@@ -6,6 +6,7 @@ export function useFormatter() {
   const store = useFormatterStore()
 
   async function format() {
+    const start = performance.now()
     try {
       if (store.mode === 'json') {
         const result = await invoke<string>('format_json', {
@@ -26,6 +27,7 @@ export function useFormatter() {
         store.setOutput(result)
         store.setError('')
       }
+      store.setDuration(Math.max(1, Math.round(performance.now() - start)))
     } catch (e) {
       store.setError(String(e))
     }

@@ -94,6 +94,8 @@
 </template>
 
 <script setup lang="ts">
+
+defineOptions({ name: 'DiffView' })
 import { computed, ref } from 'vue'
 import type { Change } from 'diff'
 import CodeEditor from '@shared/components/CodeEditor.vue'

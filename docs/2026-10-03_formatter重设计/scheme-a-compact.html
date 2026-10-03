@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>方案 A · 紧凑整合</title>
+<style>
+  :root {
+    --bg: #111827; --bg2: #1f2937; --bg3: #374151;
+    --text: #f9fafb; --text2: #d1d5db; --text3: #9ca3af;
+    --accent: #60a5fa; --accent-deep: #3b82f6; --accent-light: #1e3a5f;
+    --border: #374151; --border2: #4b5563;
+    --success: #34d399; --error: #f87171;
+    --mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 13px; overflow: hidden; }
+  .app { display: flex; height: 100vh; }
+
+  /* ===== Sidebar ===== */
+  .sidebar {
+    width: 200px; background: var(--bg2); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; flex-shrink: 0;
+  }
+  .nav { flex: 1; padding: 8px 0; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; padding: 9px 16px;
+    color: var(--text2); cursor: pointer; font-size: 13px; border-left: 2px solid transparent;
+  }
+  .nav-item:hover { background: var(--bg3); }
+  .nav-item.active { color: var(--accent); background: var(--accent-light); border-left-color: var(--accent); }
+  .nav-item .ico { width: 16px; text-align: center; }
+  .sidebar-sep { border-top: 1px solid var(--border); margin: 8px 0; }
+  .side-label { font-size: 10px; letter-spacing: .08em; color: var(--text3); padding: 4px 16px; text-transform: uppercase; }
+  .statusbar {
+    height: 28px; border-top: 1px solid var(--border); display: flex; align-items: center;
+    padding: 0 12px; gap: 16px; font-size: 11px; color: var(--text3);
+  }
+  .statusbar .mod { color: var(--accent); }
+
+  /* ===== Main ===== */
+  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+  /* 单行头部：Tab + 操作合并 */
+  .header {
+    height: 44px; background: var(--bg2); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 12px; gap: 12px; flex-shrink: 0;
+  }
+  .tabs { display: flex; gap: 2px; background: var(--bg); border-radius: 6px; padding: 3px; }
+  .tab { padding: 4px 14px; border-radius: 5px; color: var(--text3); cursor: pointer; font-size: 12.5px; }
+  .tab.active { background: var(--bg3); color: var(--text); font-weight: 600; }
+  .header-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px;
+    border: 1px solid var(--border2); border-radius: 6px; background: transparent;
+    color: var(--text2); font-size: 12.5px; cursor: pointer;
+  }
+  .btn:hover { background: var(--bg3); color: var(--text); }
+  .btn kbd {
+    font-family: var(--sans); font-size: 10px; color: var(--text3);
+    border: 1px solid var(--border2); border-radius: 3px; padding: 0 4px;
+  }
+  .btn-primary {
+    background: var(--accent-deep); border-color: var(--accent-deep); color: #fff; font-weight: 600;
+  }
+  .btn-primary:hover { background: var(--accent); border-color: var(--accent); color: #0b1220; }
+
+  /* ===== Panes ===== */
+  .panes { flex: 1; display: flex; min-height: 0; }
+  .pane { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg); }
+  .pane-head {
+    height: 36px; display: flex; align-items: center; gap: 6px;
+    padding: 0 12px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .pane-title { font-size: 11px; letter-spacing: .08em; color: var(--text3); font-weight: 600; }
+  .badge { font-size: 10px; padding: 1px 7px; border-radius: 999px; font-weight: 500; }
+  .badge-ok { background: rgba(52,211,153,.15); color: var(--success); }
+  .pane-actions { margin-left: auto; display: flex; gap: 2px; }
+  .icon-btn {
+    width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
+    border: none; background: transparent; color: var(--text3); border-radius: 5px; cursor: pointer; font-size: 13px;
+  }
+  .icon-btn:hover { background: var(--bg3); color: var(--text); }
+  .divider { width: 1px; background: var(--border); flex-shrink: 0; }
+  .editor { flex: 1; display: flex; overflow: auto; padding: 10px 14px; font-family: var(--mono); font-size: 13px; line-height: 1.65; }
+  .gutter { color: var(--text3); text-align: right; padding-right: 12px; user-select: none; white-space: pre; opacity: .6; }
+  .code { white-space: pre; color: var(--text2); }
+  .code .k { color: #93c5fd; } .code .s { color: #86efac; } .code .n { color: #fbbf24; } .code .b { color: #f0abfc; }
+  .pane-foot {
+    height: 24px; border-top: 1px solid var(--border); display: flex; align-items: center;
+    padding: 0 12px; gap: 14px; font-size: 10.5px; color: var(--text3); flex-shrink: 0;
+  }
+  .pane-foot .right { margin-left: auto; display: flex; gap: 14px; }
+  .foot-hint { display: flex; align-items: center; gap: 5px; }
+  .foot-hint kbd {
+    font-family: var(--sans); font-size: 9.5px; border: 1px solid var(--border2);
+    border-radius: 3px; padding: 0 3px; color: var(--text3);
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <nav class="nav">
+      <div class="nav-item active"><span class="ico">{}</span>Formatter</div>
+      <div class="nav-item"><span class="ico">⏱</span>Timestamp</div>
+      <div class="nav-item"><span class="ico">🔌</span>WebSocket</div>
+      <div class="nav-item"><span class="ico">⇄</span>Text Diff</div>
+      <div class="nav-item"><span class="ico">📡</span>Live Player</div>
+      <div class="nav-item"><span class="ico">🔐</span>Encryption</div>
+      <div class="nav-item"><span class="ico">🖼</span>EXIF Viewer</div>
+      <div class="nav-item"><span class="ico">📂</span>File Share</div>
+      <div class="nav-item"><span class="ico">🔄</span>Encoding</div>
+      <div class="sidebar-sep"></div>
+      <div class="side-label">System</div>
+      <div class="nav-item"><span class="ico">⌨</span>Shortcuts</div>
+      <div class="nav-item"><span class="ico">☀</span>Light</div>
+      <div class="nav-item"><span class="ico">←</span></div>
+    </nav>
+    <div class="statusbar"><span class="mod">Formatter</span><span>Shortcut: Ctrl+1</span></div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <!-- 合并后的单行头部 -->
+    <div class="header">
+      <div class="tabs">
+        <div class="tab active">JSON</div>
+        <div class="tab">XML</div>
+        <div class="tab">YAML</div>
+      </div>
+      <div class="header-actions">
+        <button class="btn">↷ Unescape</button>
+        <button class="btn">⧉ Compress Copy</button>
+        <button class="btn">⧬ Copy</button>
+        <button class="btn btn-primary">▶ Format <kbd>Ctrl+Enter</kbd></button>
+      </div>
+    </div>
+
+    <div class="panes">
+      <!-- INPUT -->
+      <section class="pane">
+        <div class="pane-head">
+          <span class="pane-title">INPUT</span>
+          <span class="badge badge-ok">Valid JSON</span>
+          <div class="pane-actions">
+            <button class="icon-btn" title="粘贴">📋</button>
+            <button class="icon-btn" title="打开文件">📂</button>
+            <button class="icon-btn" title="清空">✕</button>
+          </div>
+        </div>
+        <div class="editor">
+          <div class="gutter">1
+2
+3
+4
+5
+6</div><div class="code">{"name":"toolkit-desktop","version":"0.5.1",
+"modules":["formatter","timestamp","websocket","diff"],
+"config":{"theme":"dark","autoFormat":true,"indent":2},
+"stats":{"stars":128,"issues":4},
+"author":"5faith",
+"license":"MIT"}</div>
+        </div>
+        <div class="pane-foot">
+          <span>6 行 · 214 字符</span>
+          <div class="right">
+            <span class="foot-hint"><kbd>Tab</kbd> 缩进</span>
+            <span class="foot-hint"><kbd>Ctrl+Enter</kbd> 格式化</span>
+          </div>
+        </div>
+      </section>
+
+      <div class="divider"></div>
+
+      <!-- OUTPUT -->
+      <section class="pane">
+        <div class="pane-head">
+          <span class="pane-title">OUTPUT</span>
+          <span class="badge badge-ok">UTF-8</span>
+          <div class="pane-actions">
+            <button class="icon-btn" title="换行/折叠切换">⏎</button>
+            <button class="icon-btn" title="复制">⧉</button>
+            <button class="icon-btn" title="下载">⬇</button>
+          </div>
+        </div>
+        <div class="editor">
+          <div class="gutter">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12</div><div class="code"><span class="p">{</span>
+  <span class="k">"name"</span>: <span class="s">"toolkit-desktop"</span>,
+  <span class="k">"version"</span>: <span class="s">"0.5.1"</span>,
+  <span class="k">"modules"</span>: [
+    <span class="s">"formatter"</span>,
+    <span class="s">"timestamp"</span>,
+    <span class="s">"websocket"</span>,
+    <span class="s">"diff"</span>
+  ],
+  <span class="k">"config"</span>: {
+    <span class="k">"theme"</span>: <span class="s">"dark"</span>,
+    <span class="k">"autoFormat"</span>: <span class="b">true</span>,
+    <span class="k">"indent"</span>: <span class="n">2</span>
+  },
+  <span class="k">"stats"</span>: {
+    <span class="k">"stars"</span>: <span class="n">128</span>,
+    <span class="k">"issues"</span>: <span class="n">4</span>
+  },
+  <span class="k">"author"</span>: <span class="s">"5faith"</span>,
+  <span class="k">"license"</span>: <span class="s">"MIT"</span>
+}</div>
+        </div>
+        <div class="pane-foot">
+          <span>19 行 · 386 字符</span>
+          <div class="right">
+            <span>缩进: 2 空格</span>
+            <span class="foot-hint"><kbd>Ctrl+L</kbd> 复制</span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="statusbar">
+      <span class="mod">Formatter</span>
+      <span>JSON</span>
+      <span>✔ 格式化成功 · 12ms</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>

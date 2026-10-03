@@ -217,6 +217,8 @@
 </template>
 
 <script setup lang="ts">
+
+defineOptions({ name: 'FileShareView' })
 import { ref, reactive, onMounted } from 'vue'
 import { confirm } from '@tauri-apps/plugin-dialog'
 import { useFileshareStore, type SharedFile, type SettingsErrors } from '../store'

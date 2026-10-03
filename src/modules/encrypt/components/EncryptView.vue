@@ -92,6 +92,8 @@
 </template>
 
 <script setup lang="ts">
+
+defineOptions({ name: 'EncryptView' })
 import { ref } from 'vue'
 import CodeEditor from '@shared/components/CodeEditor.vue'
 import { useClipboard } from '@shared/composables/useClipboard'

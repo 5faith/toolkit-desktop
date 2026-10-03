@@ -9,6 +9,7 @@ export const useFormatterStore = defineStore('formatter', () => {
   const mode = ref<FormatMode>('json')
   const indentSize = ref(2)
   const error = ref('')
+  const durationMs = ref<number | null>(null)
 
   function setInput(text: string) {
     inputText.value = text
@@ -23,11 +24,24 @@ export const useFormatterStore = defineStore('formatter', () => {
     error.value = msg
   }
 
+  function setDuration(ms: number) {
+    durationMs.value = ms
+  }
+
+  /** exchange input and output contents */
+  function swap() {
+    const input = inputText.value
+    inputText.value = outputText.value
+    outputText.value = input
+    error.value = ''
+  }
+
   function setMode(m: FormatMode) {
     mode.value = m
     inputText.value = ''
     outputText.value = ''
     error.value = ''
+    durationMs.value = null
   }
 
   return {
@@ -36,9 +50,12 @@ export const useFormatterStore = defineStore('formatter', () => {
     mode,
     indentSize,
     error,
+    durationMs,
     setInput,
     setOutput,
     setError,
+    setDuration,
+    swap,
     setMode,
   }
 })

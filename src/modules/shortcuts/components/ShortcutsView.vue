@@ -18,6 +18,8 @@
 </template>
 
 <script setup lang="ts">
+
+defineOptions({ name: 'ShortcutsView' })
 import { computed } from 'vue'
 import { moduleRegistry } from '@core/module-registry'
 

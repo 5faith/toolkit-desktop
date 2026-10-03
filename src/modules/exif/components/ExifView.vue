@@ -145,6 +145,8 @@
 </template>
 
 <script setup lang="ts">
+
+defineOptions({ name: 'ExifView' })
 import { computed, ref } from 'vue'
 import { useExifStore } from '../store'
 import { useExif } from '../composables/useExif'

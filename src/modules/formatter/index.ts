@@ -7,6 +7,7 @@ const formatterModule: ToolModule = {
   name: meta.name,
   icon: meta.icon,
   shortcut: meta.shortcut,
+  card: false,
   route: {
     path: '/formatter',
     name: 'formatter',
