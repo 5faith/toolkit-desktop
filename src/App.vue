@@ -39,10 +39,10 @@
         </div>
         <div
           class="sidebar__item sidebar__item--system"
-          @click="toggleTheme"
+          @click="settingsOpen = true"
         >
-          <span class="sidebar__icon">{{ isDark ? '☀' : '☾' }}</span>
-          <span v-if="!appStore.sidebarCollapsed" class="sidebar__name">{{ isDark ? 'Light' : 'Dark' }}</span>
+          <span class="sidebar__icon">⚙</span>
+          <span v-if="!appStore.sidebarCollapsed" class="sidebar__name">Settings</span>
         </div>
         <button class="sidebar__toggle" @click="appStore.toggleSidebar()">
           {{ appStore.sidebarCollapsed ? '→' : '←' }}
@@ -90,6 +90,8 @@
 
     <NotificationContainer />
 
+    <AppSettingsDialog :open="settingsOpen" @close="settingsOpen = false" />
+
     <template #statusbar>
       <StatusBar :active-module-name="activeTabModule?.name">
         {{ activeTabShortcut ? `Shortcut: ${activeTabShortcut}` : '' }}
@@ -108,11 +110,12 @@ import TabBar from '@shared/components/TabBar.vue'
 import type { TabItem } from '@shared/types/tab'
 import TabHost from '@shared/components/TabHost.vue'
 import NotificationContainer from '@shared/components/NotificationContainer.vue'
+import AppSettingsDialog from '@shared/components/AppSettingsDialog.vue'
 import { useAppStore, type TabInstance } from '@/stores/app'
 import { useShortcutStore, APP_SHORTCUT_ACTIONS } from '@/stores/shortcuts'
 import { useModule } from '@shared/composables/useModule'
 import { useShortcuts, type ShortcutBinding } from '@shared/composables/useShortcuts'
-import { useTheme } from '@shared/composables/useTheme'
+import { useDevTools } from '@shared/composables/useDevTools'
 import { setTabSeed } from '@shared/composables/useTabStore'
 import { setStorageItem } from '@shared/utils/storage'
 import type { ToolModule } from '@core/module'
@@ -123,7 +126,8 @@ const router = useRouter()
 const appStore = useAppStore()
 const shortcutStore = useShortcutStore()
 const { allModules, switchModule } = useModule()
-const { isDark, toggleTheme } = useTheme()
+const { initialize: initializeDevTools } = useDevTools()
+const settingsOpen = ref(false)
 
 void shortcutStore.initialize()
 
@@ -426,6 +430,7 @@ function setupWindowWidthPersistence() {
 
 onMounted(async () => {
   setupWindowWidthPersistence()
+  void initializeDevTools()
 
   await appStore.restoreTabs()
   appStore.pruneTabs(allModules.value.map(mod => mod.id))

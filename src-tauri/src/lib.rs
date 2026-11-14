@@ -77,6 +77,8 @@ pub fn run() {
             commands::fileshare::list_directory_files,
             commands::storage::get_storage_path,
             commands::shortcuts::check_shortcut_conflicts,
+            commands::app::open_devtools,
+            commands::app::get_app_version,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
