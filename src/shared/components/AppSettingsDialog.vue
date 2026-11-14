@@ -1,7 +1,13 @@
 <template>
   <Teleport to="body">
     <Transition name="settings-dialog">
-      <div v-if="open" class="settings-dialog" @click.self="emit('close')">
+      <div
+        v-if="open"
+        class="settings-dialog"
+        @mousedown="onOverlayMouseDown"
+        @mouseup="onOverlayMouseUp"
+        @click="onOverlayClick"
+      >
         <section
           class="settings-dialog__panel"
           role="dialog"
@@ -84,10 +90,17 @@ import { invoke } from '@tauri-apps/api/core'
 import packageJson from '../../../package.json'
 import { useTheme } from '@shared/composables/useTheme'
 import { useDevTools } from '@shared/composables/useDevTools'
+import { useOverlayDismiss } from '@shared/composables/useOverlayDismiss'
 import type { ThemeMode } from '@shared/types/common'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: [] }>()
+
+const {
+  onMouseDown: onOverlayMouseDown,
+  onMouseUp: onOverlayMouseUp,
+  onClick: onOverlayClick,
+} = useOverlayDismiss(() => emit('close'))
 
 const { mode, setTheme } = useTheme()
 const { enabled: devtoolsEnabled, isDesktop, setEnabled, openDevTools } = useDevTools()

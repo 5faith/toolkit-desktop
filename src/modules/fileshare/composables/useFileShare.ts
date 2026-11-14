@@ -42,13 +42,36 @@ export function useFileShare() {
   const interfaces = ref<NetworkInterface[]>([])
   const selectedIp = ref('')
 
+  /** 选择默认网卡：优先出口路由 IP，其次非链路本地 IPv4，最后任意可用网卡。 */
+  async function pickDefaultIp(list: NetworkInterface[]): Promise<string> {
+    try {
+      const primary = await safeInvoke<string>('get_local_ip', { useIpv6: false })
+      if (primary && list.some(i => i.ip === primary)) return primary
+    } catch { /* ignore */ }
+
+    const candidates = list.filter(i => !i.is_ipv6 && !i.ip.startsWith('169.254.'))
+    return (candidates[0] ?? list.find(i => !i.is_ipv6) ?? list[0])?.ip ?? ''
+  }
+
   async function loadInterfaces() {
     try {
       const list = await safeInvoke<NetworkInterface[]>('list_network_interfaces')
       interfaces.value = list
-      if (!selectedIp.value && list.length > 0) {
-        const ipv4 = list.find(i => !i.is_ipv6)
-        selectedIp.value = ipv4 ? ipv4.ip : list[0].ip
+
+      const usable = (i: NetworkInterface) => !i.ip.startsWith('169.254.')
+      const saved = list.find(i => i.ip === store.settings.networkIp && usable(i))
+      if (saved) {
+        selectedIp.value = saved.ip
+      } else if (!selectedIp.value || !list.some(i => i.ip === selectedIp.value && usable(i))) {
+        selectedIp.value = await pickDefaultIp(list)
+      }
+
+      const current = list.find(i => i.ip === selectedIp.value)
+      if (current) {
+        store.useIpv6 = current.is_ipv6
+        if (store.settings.networkIp !== current.ip) {
+          store.updateSettings({ networkIp: current.ip })
+        }
       }
     } catch (e) {
       console.warn('Failed to list interfaces:', e)
@@ -60,6 +83,7 @@ export function useFileShare() {
     const iface = interfaces.value.find(i => i.ip === ip)
     if (iface) {
       store.useIpv6 = iface.is_ipv6
+      store.updateSettings({ networkIp: ip })
       store.setCurrentIp(ip)
       store.setShareLink(`http://${ip}:${store.settings.port}`)
     }
@@ -75,8 +99,25 @@ export function useFileShare() {
     }
   }
 
+  function describeStartError(e: unknown): string {
+    const raw = e instanceof Error ? e.message : String(e)
+    if (/os error 5|access is denied|拒绝访问/i.test(raw)) {
+      return `上传目录不可写：${store.settings.uploadPath}，请点击「⚙ 设置」修改上传路径后重试`
+    }
+    return raw
+  }
+
   async function startServer() {
     error.value = ''
+
+    await store.ensureValidUploadPath()
+
+    if (!store.settings.uploadPath.trim()) {
+      error.value = '请先在「⚙ 设置」中配置上传路径'
+      store.setRunning(false)
+      return
+    }
+
     store.setRunning(true)
 
     try {
@@ -106,7 +147,7 @@ export function useFileShare() {
 
       await refreshDirectoryFiles()
     } catch (e) {
-      error.value = String(e)
+      error.value = describeStartError(e)
       store.setRunning(false)
     }
   }

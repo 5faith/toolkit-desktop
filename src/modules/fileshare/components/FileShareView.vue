@@ -105,7 +105,7 @@
         </div>
       </div>
 
-    <div v-if="showShareText" class="fs-settings-overlay" @click.self="closeShareText">
+    <div v-if="showShareText" class="fs-settings-overlay" @mousedown="shareTextDismiss.onMouseDown" @mouseup="shareTextDismiss.onMouseUp" @click="shareTextDismiss.onClick">
       <div class="fs-settings-dialog">
         <div class="fs-settings-dialog__header">
           <span>分享文本</span>
@@ -135,22 +135,25 @@
       </div>
     </div>
 
-    <div v-if="store.showSettings" class="fs-settings-overlay" @click.self="closeSettings">
+    <div v-if="store.showSettings" class="fs-settings-overlay" @mousedown="settingsDismiss.onMouseDown" @mouseup="settingsDismiss.onMouseUp" @click="settingsDismiss.onClick">
       <div class="fs-settings-dialog">
         <div class="fs-settings-dialog__header">
           <span>设置</span>
           <button class="fs-settings-dialog__close" @click="closeSettings">✕</button>
         </div>
         <div class="fs-settings-dialog__body">
-          <div class="fs-setting-row">
+          <div class="fs-setting-row fs-setting-row--path">
             <span class="fs-setting-label">上传路径</span>
             <div class="fs-setting-field">
-              <input
-                class="fs-setting-input"
-                :class="{ 'fs-setting-input--error': errors.uploadPath }"
-                :value="store.settings.uploadPath"
-                @input="onUploadPathInput($event)"
-              />
+              <div class="fs-setting-path">
+                <input
+                  class="fs-setting-input"
+                  :class="{ 'fs-setting-input--error': errors.uploadPath }"
+                  :value="store.settings.uploadPath"
+                  @input="onUploadPathInput($event)"
+                />
+                <button class="btn btn--outline" @click="pickUploadPath">选择</button>
+              </div>
               <span v-if="errors.uploadPath" class="fs-setting-error">{{ errors.uploadPath }}</span>
             </div>
           </div>
@@ -210,11 +213,12 @@
 
 defineOptions({ name: 'FileShareView' })
 import { ref, reactive, computed, watch, onMounted } from 'vue'
-import { confirm } from '@tauri-apps/plugin-dialog'
+import { confirm, open } from '@tauri-apps/plugin-dialog'
 import { useFileshareStore, type SharedFile, type SettingsErrors } from '../store'
 import { useFileShare } from '../composables/useFileShare'
 import { useNotification } from '@shared/composables/useNotification'
 import { useFileDrop } from '@shared/composables/useFileDrop'
+import { useOverlayDismiss } from '@shared/composables/useOverlayDismiss'
 import { useAppStore } from '@/stores/app'
 
 const store = useFileshareStore()
@@ -226,6 +230,9 @@ const {
   addManualFiles, removeManualFile, clearManualFiles,
 } = useFileShare()
 const notification = useNotification()
+
+const shareTextDismiss = useOverlayDismiss(closeShareText)
+const settingsDismiss = useOverlayDismiss(closeSettings)
 
 const starting = ref(false)
 const isActive = computed(() => {
@@ -246,8 +253,9 @@ const shareTextFilename = ref('note.txt')
 const shareTextContent = ref('')
 const filePathInput = ref('')
 
-onMounted(() => {
-  loadInterfaces()
+onMounted(async () => {
+  await store.initialize()
+  void loadInterfaces()
   if (isActive.value) void ensureServerRunning()
 })
 
@@ -397,6 +405,22 @@ function onUploadPathInput(event: Event) {
   if (errors.uploadPath) {
     const result = store.validateSettings()
     errors.uploadPath = result.uploadPath
+  }
+}
+
+async function pickUploadPath() {
+  try {
+    const selected = await open({
+      directory: true,
+      multiple: false,
+      defaultPath: store.settings.uploadPath || undefined,
+    })
+    if (typeof selected === 'string' && selected) {
+      store.updateSettings({ uploadPath: selected })
+      delete errors.uploadPath
+    }
+  } catch {
+    notification.warning('无法打开目录选择器')
   }
 }
 
@@ -704,7 +728,7 @@ function closeSettings() {
 .fs-settings-dialog {
   background: var(--color-bg-primary);
   border-radius: var(--radius-lg);
-  width: 420px;
+  width: 480px;
   max-width: 90vw;
   box-shadow: var(--shadow-lg);
 }
@@ -788,6 +812,27 @@ function closeSettings() {
   flex-direction: column;
   align-items: flex-end;
   gap: 2px;
+}
+
+.fs-setting-row--path {
+  gap: var(--spacing-md);
+}
+
+.fs-setting-row--path .fs-setting-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.fs-setting-path {
+  display: flex;
+  gap: var(--spacing-sm);
+  width: 100%;
+}
+
+.fs-setting-path .fs-setting-input {
+  flex: 1;
+  width: auto;
+  min-width: 0;
 }
 
 .fs-setting-input--error {

@@ -1,6 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref, watch, onMounted } from 'vue'
+import { downloadDir } from '@tauri-apps/api/path'
 import { getStorageItem, setStorageItem } from '@shared/utils/storage'
+
+const isTauri = '__TAURI_INTERNALS__' in window
 
 export interface SharedFile {
   id: string
@@ -21,6 +24,7 @@ export interface FileShareSettings {
   port: number
   passwordAuth: boolean
   password: string
+  networkIp: string
 }
 
 export interface SettingsErrors {
@@ -33,10 +37,23 @@ const SETTINGS_KEY = 'fileshare:settings'
 const MANUAL_FILES_KEY = 'fileshare:manualFiles'
 
 const defaultSettings: FileShareSettings = {
-  uploadPath: 'C:\\Users\\fidel\\Downloads',
+  uploadPath: '',
   port: 5421,
   passwordAuth: false,
   password: '',
+  networkIp: '',
+}
+
+/** 旧版本写死的无效默认路径，初始化时自动替换为系统下载目录。 */
+const LEGACY_UPLOAD_PATHS = ['C:\\Users\\fidel\\Downloads']
+
+async function resolveDefaultUploadPath(): Promise<string> {
+  if (!isTauri) return 'C:\\Users\\Downloads'
+  try {
+    return await downloadDir()
+  } catch {
+    return ''
+  }
 }
 
 export const useFileshareStore = defineStore('fileshare', () => {
@@ -58,11 +75,21 @@ export const useFileshareStore = defineStore('fileshare', () => {
       initPromise = (async () => {
         const saved = await getStorageItem<FileShareSettings>(SETTINGS_KEY, { ...defaultSettings })
         settings.value = { ...defaultSettings, ...saved }
+        await ensureValidUploadPath()
         const savedManual = await getStorageItem<SharedFile[]>(MANUAL_FILES_KEY, [])
         manualFiles.value = savedManual
       })()
     }
     return initPromise
+  }
+
+  /** 修正空路径或旧版本写死的无效默认路径，返回当前可用的上传目录。 */
+  async function ensureValidUploadPath(): Promise<string> {
+    const current = settings.value.uploadPath.trim()
+    if (current && !LEGACY_UPLOAD_PATHS.includes(current)) return current
+    const resolved = await resolveDefaultUploadPath()
+    if (resolved) settings.value = { ...settings.value, uploadPath: resolved }
+    return settings.value.uploadPath
   }
 
   onMounted(() => {
@@ -159,6 +186,7 @@ export const useFileshareStore = defineStore('fileshare', () => {
     settings,
     showSettings,
     initialize,
+    ensureValidUploadPath,
     validateSettings,
     setRunning,
     setShareLink,
