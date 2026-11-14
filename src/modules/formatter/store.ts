@@ -67,14 +67,6 @@ export function useFormatterStore(tabId = useCurrentTabId()) {
       indentSize.value = size
     }
 
-    /** exchange input and output contents */
-    function swap() {
-      const input = inputText.value
-      inputText.value = outputText.value
-      outputText.value = input
-      error.value = ''
-    }
-
     function setMode(m: FormatMode) {
       mode.value = m
       inputText.value = ''
@@ -101,7 +93,6 @@ export function useFormatterStore(tabId = useCurrentTabId()) {
       setError,
       setDuration,
       setIndentSize,
-      swap,
       setMode,
       setSplitRatio,
     }

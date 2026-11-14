@@ -2,5 +2,5 @@ export default {
   id: 'fileshare',
   name: 'File Share',
   icon: '📡',
-  shortcut: 'Ctrl+7',
+  shortcut: 'Ctrl+8',
 }

@@ -1,14 +1,21 @@
 import { LazyStore } from '@tauri-apps/plugin-store'
+import { invoke } from '@tauri-apps/api/core'
 
 const isTauri = '__TAURI_INTERNALS__' in window
 
 let storePromise: Promise<LazyStore> | null = null
 
-function getStore(): Promise<LazyStore> {
+async function getStore(): Promise<LazyStore> {
   if (!storePromise) {
-    storePromise = Promise.resolve(
-      new LazyStore('toolkit.json', { autoSave: false })
-    )
+    storePromise = (async () => {
+      let path = 'toolkit.json'
+      try {
+        path = await invoke<string>('get_storage_path')
+      } catch {
+        // 命令不可用时退回插件默认路径
+      }
+      return new LazyStore(path, { autoSave: false })
+    })()
   }
   return storePromise
 }

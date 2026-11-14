@@ -92,15 +92,16 @@
 
     <template #statusbar>
       <StatusBar :active-module-name="activeTabModule?.name">
-        {{ activeTabModule?.shortcut ? `Shortcut: ${activeTabModule.shortcut}` : '' }}
+        {{ activeTabShortcut ? `Shortcut: ${activeTabShortcut}` : '' }}
       </StatusBar>
     </template>
   </ToolShell>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch, type ComponentPublicInstance } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type ComponentPublicInstance } from 'vue'
 import { useRouter } from 'vue-router'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import ToolShell from '@shared/components/ToolShell.vue'
 import StatusBar from '@shared/components/StatusBar.vue'
 import TabBar from '@shared/components/TabBar.vue'
@@ -108,18 +109,23 @@ import type { TabItem } from '@shared/types/tab'
 import TabHost from '@shared/components/TabHost.vue'
 import NotificationContainer from '@shared/components/NotificationContainer.vue'
 import { useAppStore, type TabInstance } from '@/stores/app'
+import { useShortcutStore, APP_SHORTCUT_ACTIONS } from '@/stores/shortcuts'
 import { useModule } from '@shared/composables/useModule'
-import { useShortcuts } from '@shared/composables/useShortcuts'
+import { useShortcuts, type ShortcutBinding } from '@shared/composables/useShortcuts'
 import { useTheme } from '@shared/composables/useTheme'
 import { setTabSeed } from '@shared/composables/useTabStore'
+import { setStorageItem } from '@shared/utils/storage'
 import type { ToolModule } from '@core/module'
 
 const SYSTEM_MODULE_IDS = new Set(['shortcuts'])
 
 const router = useRouter()
 const appStore = useAppStore()
+const shortcutStore = useShortcutStore()
 const { allModules, switchModule } = useModule()
 const { isDark, toggleTheme } = useTheme()
+
+void shortcutStore.initialize()
 
 const toolModules = computed(() => allModules.value.filter(m => !SYSTEM_MODULE_IDS.has(m.id)))
 const systemModules = computed(() => allModules.value.filter(m => SYSTEM_MODULE_IDS.has(m.id)))
@@ -135,6 +141,12 @@ const activeTab = computed(
 const activeTabModule = computed(() => {
   const moduleId = activeTab.value?.moduleId
   return moduleId ? moduleOf(moduleId) : undefined
+})
+
+const activeTabShortcut = computed(() => {
+  const mod = activeTabModule.value
+  if (!mod?.shortcut) return ''
+  return shortcutStore.getShortcut(`module:${mod.id}`, mod.shortcut)
 })
 
 const tabItems = computed<TabItem[]>(() => {
@@ -332,13 +344,34 @@ function cycleTab(delta: number) {
   onActivateTab(next.id)
 }
 
-const { register: registerShortcut } = useShortcuts({ onModuleSwitch: onOpenModule })
-registerShortcut('Ctrl+w', closeActiveTab)
-registerShortcut('Ctrl+Shift+D', duplicateActiveTab)
-registerShortcut('Ctrl+Tab', () => cycleTab(1))
-registerShortcut('Ctrl+Shift+Tab', () => cycleTab(-1))
-registerShortcut('Ctrl+PageDown', () => cycleTab(1))
-registerShortcut('Ctrl+PageUp', () => cycleTab(-1))
+const appShortcutHandlers: Record<string, (() => void) | undefined> = {
+  'tab.close': closeActiveTab,
+  'tab.duplicate': duplicateActiveTab,
+  'tab.next': () => cycleTab(1),
+  'tab.prev': () => cycleTab(-1),
+  'tab.next.page': () => cycleTab(1),
+  'tab.prev.page': () => cycleTab(-1),
+}
+
+const shortcutBindings = computed<ShortcutBinding[]>(() => {
+  const bindings: ShortcutBinding[] = []
+
+  for (const mod of allModules.value) {
+    if (!mod.shortcut) continue
+    const shortcut = shortcutStore.getShortcut(`module:${mod.id}`, mod.shortcut)
+    if (shortcut) bindings.push({ shortcut, handler: () => onOpenModule(mod.id) })
+  }
+
+  for (const action of APP_SHORTCUT_ACTIONS) {
+    const shortcut = shortcutStore.getShortcut(action.id, action.defaultShortcut)
+    const handler = appShortcutHandlers[action.id]
+    if (shortcut && handler) bindings.push({ shortcut, handler })
+  }
+
+  return bindings
+})
+
+useShortcuts(shortcutBindings)
 
 watch(
   () => router.currentRoute.value.meta.moduleId,
@@ -367,7 +400,33 @@ watch(
 
 let tabsReady = false
 
+const isTauri = '__TAURI_INTERNALS__' in window
+const WINDOW_WIDTH_KEY = 'window:width'
+let resizeTimer: ReturnType<typeof setTimeout> | undefined
+let unlistenResize: (() => void) | undefined
+let disposed = false
+
+function setupWindowWidthPersistence() {
+  if (!isTauri) return
+
+  const appWindow = getCurrentWindow()
+  void appWindow.onResized(({ payload }) => {
+    if (resizeTimer) clearTimeout(resizeTimer)
+    resizeTimer = setTimeout(async () => {
+      if (disposed || await appWindow.isMaximized()) return
+      const scale = await appWindow.scaleFactor()
+      const width = Math.round(payload.width / scale)
+      if (width >= 800) void setStorageItem(WINDOW_WIDTH_KEY, width)
+    }, 300)
+  }).then(unlisten => {
+    if (disposed) unlisten()
+    else unlistenResize = unlisten
+  })
+}
+
 onMounted(async () => {
+  setupWindowWidthPersistence()
+
   await appStore.restoreTabs()
   appStore.pruneTabs(allModules.value.map(mod => mod.id))
   tabsReady = true
@@ -389,6 +448,12 @@ onMounted(async () => {
 
   const firstModule = allModules.value[0]
   if (firstModule) onOpenModule(firstModule.id)
+})
+
+onBeforeUnmount(() => {
+  disposed = true
+  if (resizeTimer) clearTimeout(resizeTimer)
+  unlistenResize?.()
 })
 </script>
 

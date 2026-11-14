@@ -30,3 +30,8 @@ kamadak-exif = "0.5"
 base64 = "0.22"
 image = { version = "0.25", default-features = false, features = ["tiff", "png"] }
 tauri-plugin-mpv = { git = "https://github.com/nini22P/tauri-plugin-mpv" }
+
+[target.'cfg(windows)'.dependencies]
+webview2-com = "0.38"
+windows-core = "0.61"
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_Input_KeyboardAndMouse"] }

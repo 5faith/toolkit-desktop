@@ -60,10 +60,6 @@
         </section>
       </template>
 
-      <template #handle>
-        <button class="formatter-view__swap-btn" title="Swap input/output" @click="store.swap()">⇄</button>
-      </template>
-
       <template #second>
         <FormatterOutputPane />
       </template>
@@ -146,28 +142,6 @@ async function pasteInput() {
 .formatter-view__panels {
   flex: 1;
   min-height: 0;
-}
-
-.formatter-view__swap-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--color-border-hover);
-  border-radius: 50%;
-  background: var(--color-bg-primary);
-  color: var(--color-text-secondary);
-  font-size: 14px;
-  cursor: pointer;
-  box-shadow: var(--shadow-md);
-  transition: color 0.15s, border-color 0.15s, transform 0.25s;
-}
-
-.formatter-view__swap-btn:hover {
-  color: var(--color-accent);
-  border-color: var(--color-accent);
-  transform: rotate(180deg);
 }
 
 .formatter-view__error {
