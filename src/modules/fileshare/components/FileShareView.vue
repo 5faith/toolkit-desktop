@@ -1,48 +1,46 @@
 <template>
-  <div class="fileshare-view">
-    <template v-if="!store.running">
-      <div class="fileshare-view__idle">
-        <button class="settings-btn" @click="store.toggleSettings()">⚙ 设置</button>
-        <button class="start-btn" @click="startServer">开启服务</button>
-        <button class="stop-btn" @click="onForceStop">⏹ 关闭残留服务</button>
-        <button class="open-dir-btn" @click="openFolder()">📁 打开上传目录</button>
-        <div v-if="error" class="fs-error">{{ error }}</div>
-      </div>
-    </template>
-
-    <template v-else>
-      <div class="fileshare-view__active">
-        <div class="fs-card">
-          <div class="fs-card__header">
-            <span class="fs-status">正在分享...</span>
-            <div class="fs-header-actions">
-              <button class="btn btn--outline" @click="store.toggleSettings()">⚙ 设置</button>
-              <button class="btn btn--danger-outline" @click="stopServer">取消分享</button>
-            </div>
-          </div>
-          <div class="fs-card__body">
-            <span class="fs-link-label">分享链接:</span>
-            <span class="fs-link-value">{{ store.shareLink }}</span>
-            <div class="fs-link-actions">
-              <button class="btn btn--outline" @click="onCopyLink">🔗 复制链接</button>
-              <div class="fs-nic-select">
-                <span class="fs-nic-label">网卡:</span>
-                <select class="fs-nic-dropdown" :value="selectedIp" @change="onNicChange">
-                  <option
-                    v-for="iface in interfaces"
-                    :key="iface.ip"
-                    :value="iface.ip"
-                  >
-                    {{ iface.name }} — {{ iface.ip }}{{ iface.is_ipv6 ? ' (IPv6)' : '' }}
-                  </option>
-                </select>
-              </div>
-              <button class="btn btn--outline" @click="switchIpv6">
-                📶 切换ipv{{ store.useIpv6 ? '6' : '4' }}
-              </button>
-            </div>
+  <div ref="viewRef" class="fileshare-view">
+    <div class="fileshare-view__active">
+      <div class="fs-card">
+        <div class="fs-card__header">
+          <span class="fs-status">{{ store.running ? '正在分享...' : starting ? '正在启动...' : '服务未启动' }}</span>
+          <div class="fs-header-actions">
+            <button
+              v-if="!store.running"
+              class="btn btn--outline"
+              :disabled="starting"
+              @click="ensureServerRunning"
+            >{{ starting ? '启动中...' : '重试' }}</button>
+            <button class="btn btn--outline" @click="store.toggleSettings()">⚙ 设置</button>
+            <button v-if="store.running" class="btn btn--danger-outline" @click="stopServer">取消分享</button>
           </div>
         </div>
+        <div v-if="error" class="fs-card__body">
+          <div class="fs-error">{{ error }}</div>
+        </div>
+        <div v-if="store.running" class="fs-card__body">
+          <span class="fs-link-label">分享链接:</span>
+          <span class="fs-link-value">{{ store.shareLink }}</span>
+          <div class="fs-link-actions">
+            <button class="btn btn--outline" @click="onCopyLink">🔗 复制链接</button>
+            <div class="fs-nic-select">
+              <span class="fs-nic-label">网卡:</span>
+              <select class="fs-nic-dropdown" :value="selectedIp" @change="onNicChange">
+                <option
+                  v-for="iface in interfaces"
+                  :key="iface.ip"
+                  :value="iface.ip"
+                >
+                  {{ iface.name }} — {{ iface.ip }}{{ iface.is_ipv6 ? ' (IPv6)' : '' }}
+                </option>
+              </select>
+            </div>
+            <button class="btn btn--outline" @click="switchIpv6">
+              📶 切换ipv{{ store.useIpv6 ? '6' : '4' }}
+            </button>
+          </div>
+        </div>
+      </div>
 
         <div class="fs-card">
           <div class="fs-card__header">
@@ -106,7 +104,6 @@
           </div>
         </div>
       </div>
-    </template>
 
     <div v-if="showShareText" class="fs-settings-overlay" @click.self="closeShareText">
       <div class="fs-settings-dialog">
@@ -145,17 +142,6 @@
           <button class="fs-settings-dialog__close" @click="closeSettings">✕</button>
         </div>
         <div class="fs-settings-dialog__body">
-          <div class="fs-setting-row">
-            <span class="fs-setting-label">服务自启</span>
-            <label class="fs-toggle">
-              <input
-                type="checkbox"
-                :checked="store.settings.autoStart"
-                @change="store.updateSettings({ autoStart: !store.settings.autoStart })"
-              />
-              <span class="fs-toggle__slider" />
-            </label>
-          </div>
           <div class="fs-setting-row">
             <span class="fs-setting-label">上传路径</span>
             <div class="fs-setting-field">
@@ -213,19 +199,26 @@
         </div>
       </div>
     </div>
+
+    <div v-if="dragging && !store.showSettings && !showShareText" class="fs-drag-overlay">
+      <div class="fs-drag-overlay__card">释放文件以添加到分享列表</div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 
 defineOptions({ name: 'FileShareView' })
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { confirm } from '@tauri-apps/plugin-dialog'
 import { useFileshareStore, type SharedFile, type SettingsErrors } from '../store'
 import { useFileShare } from '../composables/useFileShare'
 import { useNotification } from '@shared/composables/useNotification'
+import { useFileDrop } from '@shared/composables/useFileDrop'
+import { useAppStore } from '@/stores/app'
 
 const store = useFileshareStore()
+const appStore = useAppStore()
 const {
   error, interfaces, selectedIp,
   loadInterfaces, selectIp, startServer, stopServer,
@@ -233,6 +226,19 @@ const {
   addManualFiles, removeManualFile, clearManualFiles,
 } = useFileShare()
 const notification = useNotification()
+
+const starting = ref(false)
+const isActive = computed(() => {
+  const tab = appStore.openTabs.find(tab => tab.id === appStore.activeTabId)
+  return tab?.moduleId === store.$id
+})
+
+const viewRef = ref<HTMLElement | null>(null)
+const { dragging } = useFileDrop({
+  target: viewRef,
+  onDropPaths: handleDroppedPaths,
+  onDropFiles: handleDroppedFiles,
+})
 
 const errors = reactive<SettingsErrors>({})
 const showShareText = ref(false)
@@ -242,7 +248,23 @@ const filePathInput = ref('')
 
 onMounted(() => {
   loadInterfaces()
+  if (isActive.value) void ensureServerRunning()
 })
+
+watch(isActive, (active) => {
+  if (active) void ensureServerRunning()
+})
+
+async function ensureServerRunning() {
+  if (store.running || starting.value) return
+  starting.value = true
+  try {
+    await store.initialize()
+    if (!store.running) await startServer()
+  } finally {
+    starting.value = false
+  }
+}
 
 async function importByPath() {
   const path = filePathInput.value.trim()
@@ -251,18 +273,62 @@ async function importByPath() {
   filePathInput.value = ''
 }
 
-async function onForceStop() {
-  error.value = ''
-  try {
-    await fetch(`http://127.0.0.1:${store.settings.port}/__shutdown`, {
-      method: 'GET',
-      signal: AbortSignal.timeout(2000),
-    }).catch(() => {})
-    await new Promise(r => setTimeout(r, 300))
-    await stopServer()
-    notification.success('服务已关闭')
-  } catch (e) {
-    error.value = String(e)
+function baseName(path: string): string {
+  const index = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
+  return index === -1 ? path : path.slice(index + 1)
+}
+
+async function handleDroppedPaths(paths: string[]) {
+  if (store.showSettings || showShareText.value) return
+
+  const existingPaths = new Set(store.manualFiles.map(file => file.path))
+  const existingNames = new Set(store.manualFiles.map(file => file.name))
+  const unique: string[] = []
+
+  for (const path of paths) {
+    const name = baseName(path)
+    if (existingPaths.has(path) || existingNames.has(name)) continue
+    if (unique.some(item => item === path || baseName(item) === name)) continue
+
+    unique.push(path)
+    existingPaths.add(path)
+    existingNames.add(name)
+  }
+
+  const skipped = paths.length - unique.length
+  if (unique.length === 0) {
+    if (skipped > 0) notification.info('文件已在分享列表中')
+    return
+  }
+
+  await addManualFiles(unique)
+
+  if (error.value) {
+    notification.error(error.value)
+    return
+  }
+
+  notification.success(
+    `已添加 ${unique.length} 个文件${skipped > 0 ? `，跳过 ${skipped} 个重复项` : ''}`
+  )
+}
+
+async function handleDroppedFiles(files: File[]) {
+  if (store.showSettings || showShareText.value) return
+
+  const paths: string[] = []
+  for (const file of files) {
+    const path = (file as File & { path?: string }).path
+    if (typeof path === 'string' && path.length > 0) paths.push(path)
+  }
+
+  if (paths.length > 0) {
+    await handleDroppedPaths(paths)
+  }
+
+  const missing = files.length - paths.length
+  if (missing > 0) {
+    notification.warning(`${missing} 个文件无法读取路径，请点击「选择文件」`)
   }
 }
 
@@ -358,103 +424,49 @@ function closeSettings() {
 
 <style scoped>
 .fileshare-view {
+  position: relative;
   height: 100%;
   overflow-y: auto;
 }
 
-.fileshare-view__idle {
+.fs-drag-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100%;
-  gap: var(--spacing-md);
-  background: linear-gradient(135deg, #c3d4f9 0%, #d5b3f7 50%, #f5c6e8 100%);
-  position: relative;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
 }
 
-.start-btn {
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  background: #4da6ff;
-  color: #fff;
-  font-size: 18px;
-  font-weight: 600;
-  border: none;
-  cursor: pointer;
-  box-shadow: 0 8px 24px rgba(77, 166, 255, 0.4);
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.start-btn:hover {
-  transform: scale(1.05);
-  box-shadow: 0 12px 32px rgba(77, 166, 255, 0.5);
-}
-
-.start-btn:active {
-  transform: scale(0.98);
-}
-
-.stop-btn {
-  padding: var(--spacing-sm) var(--spacing-xl);
-  border-radius: var(--radius-md);
-  background: var(--color-error);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 500;
-  border: none;
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-
-.stop-btn:hover {
-  opacity: 0.85;
-}
-
-.settings-btn {
+.fs-drag-overlay::before {
+  content: '';
   position: absolute;
-  top: var(--spacing-md);
-  right: var(--spacing-md);
-  padding: var(--spacing-xs) var(--spacing-md);
-  background: var(--color-bg-primary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  font-size: 13px;
-  color: var(--color-text-primary);
-  cursor: pointer;
+  inset: 12px;
+  border: 2px dashed var(--color-accent);
+  border-radius: var(--radius-xl);
 }
 
-.settings-btn:hover {
-  background: var(--color-bg-hover);
-}
-
-.open-dir-btn {
-  margin-top: var(--spacing-md);
-  padding: var(--spacing-sm) var(--spacing-lg);
+.fs-drag-overlay__card {
+  position: relative;
+  z-index: 1;
+  padding: 14px 22px;
+  border-radius: 12px;
   background: var(--color-bg-primary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  color: var(--color-accent);
+  box-shadow: var(--shadow-lg);
   font-size: 14px;
-  color: var(--color-text-primary);
-  cursor: pointer;
-  box-shadow: var(--shadow-sm);
-}
-
-.open-dir-btn:hover {
-  background: var(--color-bg-hover);
-  border-color: var(--color-border-hover);
+  font-weight: 600;
 }
 
 .fs-error {
-  margin-top: var(--spacing-md);
   padding: var(--spacing-sm) var(--spacing-md);
   background: rgba(239, 68, 68, 0.1);
   color: var(--color-error);
   border-radius: var(--radius-md);
   font-size: 13px;
-  max-width: 400px;
-  text-align: center;
+  text-align: left;
 }
 
 .fileshare-view__active {

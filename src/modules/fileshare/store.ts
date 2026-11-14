@@ -17,7 +17,6 @@ export interface NetworkInterface {
 }
 
 export interface FileShareSettings {
-  autoStart: boolean
   uploadPath: string
   port: number
   passwordAuth: boolean
@@ -34,7 +33,6 @@ const SETTINGS_KEY = 'fileshare:settings'
 const MANUAL_FILES_KEY = 'fileshare:manualFiles'
 
 const defaultSettings: FileShareSettings = {
-  autoStart: false,
   uploadPath: 'C:\\Users\\fidel\\Downloads',
   port: 5421,
   passwordAuth: false,
@@ -53,11 +51,22 @@ export const useFileshareStore = defineStore('fileshare', () => {
   const settings = ref<FileShareSettings>({ ...defaultSettings })
   const showSettings = ref(false)
 
-  onMounted(async () => {
-    const saved = await getStorageItem<FileShareSettings>(SETTINGS_KEY, { ...defaultSettings })
-    settings.value = saved
-    const savedManual = await getStorageItem<SharedFile[]>(MANUAL_FILES_KEY, [])
-    manualFiles.value = savedManual
+  let initPromise: Promise<void> | null = null
+
+  async function initialize(): Promise<void> {
+    if (!initPromise) {
+      initPromise = (async () => {
+        const saved = await getStorageItem<FileShareSettings>(SETTINGS_KEY, { ...defaultSettings })
+        settings.value = { ...defaultSettings, ...saved }
+        const savedManual = await getStorageItem<SharedFile[]>(MANUAL_FILES_KEY, [])
+        manualFiles.value = savedManual
+      })()
+    }
+    return initPromise
+  }
+
+  onMounted(() => {
+    void initialize()
   })
 
   watch(settings, (v) => {
@@ -149,6 +158,7 @@ export const useFileshareStore = defineStore('fileshare', () => {
     isDragging,
     settings,
     showSettings,
+    initialize,
     validateSettings,
     setRunning,
     setShareLink,

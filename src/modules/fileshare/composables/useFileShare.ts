@@ -12,6 +12,7 @@ async function safeInvoke<T>(cmd: string, args?: Record<string, unknown>): Promi
     const mocks: Record<string, unknown> = {
       start_file_share: undefined,
       stop_file_share: undefined,
+      shutdown_residual_file_share: false,
       get_local_ip: '192.168.1.100',
       get_file_info: { name: 'mock-file.txt', size: 1024 },
       list_network_interfaces: [
@@ -64,16 +65,23 @@ export function useFileShare() {
     }
   }
 
+  async function shutdownResidualServer(): Promise<boolean> {
+    try {
+      return await safeInvoke<boolean>('shutdown_residual_file_share', {
+        port: store.settings.port,
+      })
+    } catch {
+      return false
+    }
+  }
+
   async function startServer() {
     error.value = ''
     store.setRunning(true)
 
     try {
-      await fetch(`http://127.0.0.1:${store.settings.port}/__shutdown`, {
-        method: 'GET',
-        signal: AbortSignal.timeout(2000),
-      }).catch(() => {})
-      await new Promise(r => setTimeout(r, 300))
+      const stopped = await shutdownResidualServer()
+      if (stopped) await new Promise(r => setTimeout(r, 300))
     } catch { /* ignore - residual server may not exist */ }
 
     try {
@@ -231,6 +239,7 @@ export function useFileShare() {
     selectIp,
     startServer,
     stopServer,
+    shutdownResidualServer,
     refreshLink,
     refreshDirectoryFiles,
     copyLink,

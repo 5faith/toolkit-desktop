@@ -21,6 +21,7 @@ pub fn run() {
             commands::flv::read_local_file,
             commands::fileshare::start_file_share,
             commands::fileshare::stop_file_share,
+            commands::fileshare::shutdown_residual_file_share,
             commands::fileshare::get_local_ip,
             commands::fileshare::list_network_interfaces,
             commands::fileshare::get_file_info,

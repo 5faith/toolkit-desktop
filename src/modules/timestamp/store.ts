@@ -1,24 +1,36 @@
-import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { consumeTabSeed, useTabStore } from '@shared/composables/useTabStore'
+import { useCurrentTabId } from '@shared/composables/useCurrentTab'
 
-export const useTimestampStore = defineStore('timestamp', () => {
-  const currentTimestamp = ref(Date.now())
-  const inputValue = ref('')
-  const selectedTimezones = ref(['UTC', 'Asia/Shanghai', 'America/New_York', 'Europe/London', 'Asia/Tokyo'])
+export interface TimestampSeed {
+  inputValue?: string
+  selectedTimezones?: string[]
+}
 
-  function setCurrentTimestamp(ts: number) {
-    currentTimestamp.value = ts
-  }
+export function useTimestampStore(tabId = useCurrentTabId()) {
+  return useTabStore('timestamp', tabId, () => {
+    const seed = consumeTabSeed<TimestampSeed>('timestamp', tabId)
 
-  function setInputValue(val: string) {
-    inputValue.value = val
-  }
+    const currentTimestamp = ref(Date.now())
+    const inputValue = ref(seed?.inputValue ?? '')
+    const selectedTimezones = ref(
+      seed?.selectedTimezones ?? ['UTC', 'Asia/Shanghai', 'America/New_York', 'Europe/London', 'Asia/Tokyo']
+    )
 
-  return {
-    currentTimestamp,
-    inputValue,
-    selectedTimezones,
-    setCurrentTimestamp,
-    setInputValue,
-  }
-})
+    function setCurrentTimestamp(ts: number) {
+      currentTimestamp.value = ts
+    }
+
+    function setInputValue(val: string) {
+      inputValue.value = val
+    }
+
+    return {
+      currentTimestamp,
+      inputValue,
+      selectedTimezones,
+      setCurrentTimestamp,
+      setInputValue,
+    }
+  })
+}

@@ -11,6 +11,19 @@
         {{ m.label }}
       </button>
     </div>
+
+    <label v-if="mode !== 'xml'" class="formatter-toolbar__indent" title="Indent size">
+      <span>缩进</span>
+      <select
+        class="formatter-toolbar__select"
+        :value="indentSize"
+        @change="onIndentChange"
+      >
+        <option :value="2">2 空格</option>
+        <option :value="4">4 空格</option>
+      </select>
+    </label>
+
     <div class="formatter-toolbar__actions">
       <button
         class="formatter-toolbar__btn"
@@ -19,13 +32,9 @@
       >↷ Unescape</button>
       <button
         class="formatter-toolbar__btn"
-        :disabled="mode === 'yaml'"
+        :disabled="mode === 'xml' || mode === 'yaml'"
         @click="emit('compressCopy')"
       >⧉ {{ compressCopied ? 'Copied!' : 'Compress Copy' }}</button>
-      <button
-        class="formatter-toolbar__btn"
-        @click="emit('copy')"
-      >⧬ {{ copied ? 'Copied!' : 'Copy' }}</button>
       <button
         class="formatter-toolbar__btn formatter-toolbar__btn--primary"
         @click="emit('format')"
@@ -39,16 +48,16 @@ import type { FormatMode } from '../store'
 
 defineProps<{
   mode: FormatMode
-  copied: boolean
+  indentSize: number
   compressCopied: boolean
 }>()
 
 const emit = defineEmits<{
   'update:mode': [mode: FormatMode]
+  'update:indentSize': [size: number]
   format: []
   unescape: []
   compressCopy: []
-  copy: []
 }>()
 
 const MODES: Array<{ id: FormatMode; label: string }> = [
@@ -56,6 +65,11 @@ const MODES: Array<{ id: FormatMode; label: string }> = [
   { id: 'xml', label: 'XML' },
   { id: 'yaml', label: 'YAML' },
 ]
+
+function onIndentChange(event: Event) {
+  const value = Number((event.target as HTMLSelectElement).value)
+  emit('update:indentSize', value === 4 ? 4 : 2)
+}
 </script>
 
 <style scoped>
@@ -93,6 +107,28 @@ const MODES: Array<{ id: FormatMode; label: string }> = [
   box-shadow: inset 0 0 0 1px var(--color-border-hover);
   color: var(--color-text-primary);
   font-weight: 600;
+}
+
+.formatter-toolbar__indent {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-sm);
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+
+.formatter-toolbar__select {
+  border: none;
+  background: transparent;
+  color: var(--color-text-primary);
+  font-size: 12.5px;
+  outline: none;
+  cursor: pointer;
 }
 
 .formatter-toolbar__actions {

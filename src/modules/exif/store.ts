@@ -1,5 +1,6 @@
-import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { useTabStore } from '@shared/composables/useTabStore'
+import { useCurrentTabId } from '@shared/composables/useCurrentTab'
 
 export interface ExifField {
   tag: string
@@ -39,14 +40,15 @@ export interface ExifData {
   iccFields?: ExifField[]
 }
 
-export const useExifStore = defineStore('exif', () => {
-  const filePath = ref('')
-  const fileName = ref('')
-  const fileSize = ref(0)
-  const fileSrc = ref('')
-  const exifData = ref<ExifData | null>(null)
-  const loading = ref(false)
-  const error = ref('')
+export function useExifStore(tabId = useCurrentTabId()) {
+  return useTabStore('exif', tabId, () => {
+    const filePath = ref('')
+    const fileName = ref('')
+    const fileSize = ref(0)
+    const fileSrc = ref('')
+    const exifData = ref<ExifData | null>(null)
+    const loading = ref(false)
+    const error = ref('')
 
   function setImage(path: string, name: string, size: number, src: string) {
     filePath.value = path
@@ -77,18 +79,19 @@ export const useExifStore = defineStore('exif', () => {
     error.value = ''
   }
 
-  return {
-    filePath,
-    fileName,
-    fileSize,
-    fileSrc,
-    exifData,
-    loading,
-    error,
-    setImage,
-    setExifData,
-    setLoading,
-    setError,
-    clear,
-  }
-})
+    return {
+      filePath,
+      fileName,
+      fileSize,
+      fileSrc,
+      exifData,
+      loading,
+      error,
+      setImage,
+      setExifData,
+      setLoading,
+      setError,
+      clear,
+    }
+  })
+}

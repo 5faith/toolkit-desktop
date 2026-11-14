@@ -52,28 +52,33 @@
 
     <div class="app-content">
       <TabBar
-        :tabs="openedModules"
-        :active-id="appStore.activeModuleId"
-        @activate="onOpenModule"
+        :tabs="tabItems"
+        :active-id="appStore.activeTabId"
+        @activate="onActivateTab"
         @close="onCloseTab"
+        @duplicate="onDuplicateTab"
         @close-others="onCloseOthers"
+        @close-right="onCloseRight"
         @close-all="onCloseAll"
+        @move="onMoveTab"
       />
 
       <div
-        v-show="appStore.openTabs.length > 0"
-        ref="viewWrapRef"
+        v-for="tab in appStore.openTabs"
+        :key="tab.id"
+        v-show="tab.id === appStore.activeTabId"
+        :ref="tab.moduleId === 'live' ? setLiveWrap : undefined"
         class="app-content__view"
         :class="{
-          'app-content__view--plain': activeModule?.card === false,
-          'app-content__view--live': isLive,
+          'app-content__view--plain': moduleOf(tab.moduleId)?.card === false,
+          'app-content__view--live': tab.moduleId === 'live',
         }"
       >
-        <router-view v-slot="{ Component }">
-          <keep-alive :include="cachedNames">
-            <component :is="Component" />
-          </keep-alive>
-        </router-view>
+        <TabHost
+          v-if="shouldRender(tab)"
+          :tab-id="tab.id"
+          :module-id="tab.moduleId"
+        />
       </div>
 
       <div v-if="appStore.openTabs.length === 0" class="app-content__empty">
@@ -94,53 +99,90 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch, type ComponentPublicInstance } from 'vue'
 import { useRouter } from 'vue-router'
 import ToolShell from '@shared/components/ToolShell.vue'
 import StatusBar from '@shared/components/StatusBar.vue'
 import TabBar from '@shared/components/TabBar.vue'
+import type { TabItem } from '@shared/types/tab'
+import TabHost from '@shared/components/TabHost.vue'
 import NotificationContainer from '@shared/components/NotificationContainer.vue'
-import { useAppStore } from '@/stores/app'
+import { useAppStore, type TabInstance } from '@/stores/app'
 import { useModule } from '@shared/composables/useModule'
 import { useShortcuts } from '@shared/composables/useShortcuts'
 import { useTheme } from '@shared/composables/useTheme'
-import { registerModuleRoutes } from '@/router'
+import { setTabSeed } from '@shared/composables/useTabStore'
 import type { ToolModule } from '@core/module'
 
 const SYSTEM_MODULE_IDS = new Set(['shortcuts'])
 
 const router = useRouter()
 const appStore = useAppStore()
-const { allModules, activeModule, switchModule } = useModule()
+const { allModules, switchModule } = useModule()
 const { isDark, toggleTheme } = useTheme()
 
 const toolModules = computed(() => allModules.value.filter(m => !SYSTEM_MODULE_IDS.has(m.id)))
 const systemModules = computed(() => allModules.value.filter(m => SYSTEM_MODULE_IDS.has(m.id)))
 
-/** module bound to the currently open tab (registry follows the route, which may lag the tabs) */
-const activeTabModule = computed(() =>
-  allModules.value.find(m => m.id === appStore.activeModuleId)
+function moduleOf(moduleId: string): ToolModule | undefined {
+  return allModules.value.find(m => m.id === moduleId)
+}
+
+const activeTab = computed(
+  () => appStore.openTabs.find(tab => tab.id === appStore.activeTabId) ?? null
 )
 
-const openedModules = computed(() =>
-  appStore.openTabs
-    .map(id => allModules.value.find(m => m.id === id))
-    .filter((m): m is ToolModule => m !== undefined)
-)
+const activeTabModule = computed(() => {
+  const moduleId = activeTab.value?.moduleId
+  return moduleId ? moduleOf(moduleId) : undefined
+})
 
-const isLive = computed(() => appStore.activeModuleId === 'live')
+const tabItems = computed<TabItem[]>(() => {
+  const counts = new Map<string, number>()
+  const items: TabItem[] = []
+
+  for (const tab of appStore.openTabs) {
+    const mod = moduleOf(tab.moduleId)
+    if (!mod) continue
+
+    const count = (counts.get(mod.id) ?? 0) + 1
+    counts.set(mod.id, count)
+
+    items.push({
+      id: tab.id,
+      moduleId: tab.moduleId,
+      name: count === 1 ? mod.name : `${mod.name} (${count})`,
+      icon: mod.icon,
+      duplicatable: mod.duplicatable !== false,
+    })
+  }
+
+  return items
+})
+
+function shouldRender(tab: TabInstance): boolean {
+  const mod = moduleOf(tab.moduleId)
+  if (mod?.keepAlive === false) return tab.id === appStore.activeTabId
+  return true
+}
+
+const isLive = computed(() => activeTabModule.value?.id === 'live')
 
 /*
  * Live 视频垫在 WebView 之下，只有页面透明处可见。 live 模式保留正常卡片间隙，
  * 但间隙下的画布由 ToolShell 的 matte 提供；这里测量视图容器的位置，在 matte 上
  * 抠出一个圆角"洞"正对视频卡片，视频从洞中透出，间隙仍是画布色。
  */
-const viewWrapRef = ref<HTMLElement | null>(null)
+const liveWrapRef = ref<HTMLElement | null>(null)
 const liveHole = ref<{ x: number; y: number; w: number; h: number } | null>(null)
 let liveResizeObserver: ResizeObserver | null = null
 
+function setLiveWrap(el: Element | ComponentPublicInstance | null) {
+  liveWrapRef.value = el instanceof HTMLElement ? el : null
+}
+
 function measureLiveHole() {
-  const el = viewWrapRef.value
+  const el = liveWrapRef.value
   if (!isLive.value || !el) {
     liveHole.value = null
     return
@@ -151,22 +193,24 @@ function measureLiveHole() {
     : null
 }
 
-watch(isLive, live => {
-  if (live) {
-    nextTick(() => {
-      measureLiveHole()
-      const el = viewWrapRef.value
-      if (el && !liveResizeObserver) {
-        liveResizeObserver = new ResizeObserver(measureLiveHole)
-        liveResizeObserver.observe(el)
-      }
-    })
-  } else {
-    liveResizeObserver?.disconnect()
-    liveResizeObserver = null
+watch([isLive, () => appStore.activeTabId], () => {
+  liveResizeObserver?.disconnect()
+  liveResizeObserver = null
+
+  if (!isLive.value) {
     liveHole.value = null
+    return
   }
-})
+
+  nextTick(() => {
+    measureLiveHole()
+    const el = liveWrapRef.value
+    if (el) {
+      liveResizeObserver = new ResizeObserver(measureLiveHole)
+      liveResizeObserver.observe(el)
+    }
+  })
+}, { immediate: true })
 
 const liveMatteStyle = computed(() => {
   const hole = liveHole.value
@@ -195,71 +239,156 @@ const liveMatteStyle = computed(() => {
   return { clipPath: `path("${outer}${inner}")` }
 })
 
-const cachedNames = computed(() =>
-  allModules.value
-    .filter(m => m.keepAlive !== false)
-    .map(m => getViewName(m))
-    .filter((name): name is string => name !== undefined)
-)
+function isOpen(moduleId: string) {
+  return appStore.openTabs.some(tab => tab.moduleId === moduleId)
+}
 
-function getViewName(mod: ToolModule): string | undefined {
-  const comp: unknown = mod.route.component
-  if (comp && typeof comp === 'object' && 'name' in comp) {
-    const name = (comp as { name?: unknown }).name
-    if (typeof name === 'string') return name
+function syncRoute(moduleId: string) {
+  const path = `/${moduleId}`
+  if (router.currentRoute.value.path !== path) {
+    void router.push(path)
   }
-  return undefined
 }
 
-function isOpen(id: string) {
-  return appStore.openTabs.includes(id)
+function onOpenModule(moduleId: string) {
+  appStore.openTab(moduleId)
+  switchModule(moduleId)
+  syncRoute(moduleId)
 }
 
-function onOpenModule(id: string) {
-  appStore.openTab(id)
-  switchModule(id)
-  router.push(`/${id}`)
+function onActivateTab(tabId: string) {
+  const tab = appStore.openTabs.find(item => item.id === tabId)
+  if (!tab) return
+
+  appStore.activateTab(tabId)
+  switchModule(tab.moduleId)
+  syncRoute(tab.moduleId)
 }
 
-function onCloseTab(id: string) {
-  const next = appStore.closeTab(id)
+function onDuplicateTab(tabId: string) {
+  const source = appStore.openTabs.find(tab => tab.id === tabId)
+  if (!source) return
+
+  const mod = moduleOf(source.moduleId)
+  if (!mod || mod.duplicatable === false) return
+
+  const newTabId = appStore.insertDuplicateTab(tabId)
+  if (!newTabId) return
+
+  setTabSeed(source.moduleId, newTabId, mod.createDuplicateState?.(tabId))
+  onActivateTab(newTabId)
+}
+
+function onCloseTab(tabId: string) {
+  const nextTabId = appStore.closeTab(tabId)
+  const next = nextTabId
+    ? appStore.openTabs.find(tab => tab.id === nextTabId)
+    : null
+
   if (next) {
-    switchModule(next)
-    router.push(`/${next}`)
-  } else {
-    router.replace('/')
+    switchModule(next.moduleId)
+    syncRoute(next.moduleId)
   }
 }
 
-function onCloseOthers(id: string) {
-  appStore.closeOthers(id)
-  switchModule(id)
-  router.push(`/${id}`)
+function onCloseOthers(tabId: string) {
+  appStore.closeOthers(tabId)
+  onActivateTab(tabId)
+}
+
+function onCloseRight(tabId: string) {
+  const nextTabId = appStore.closeTabsToRight(tabId)
+  if (nextTabId) onActivateTab(nextTabId)
 }
 
 function onCloseAll() {
   appStore.closeAll()
-  router.replace('/')
+}
+
+function onMoveTab(fromIndex: number, toIndex: number) {
+  appStore.moveTab(fromIndex, toIndex)
 }
 
 function closeActiveTab() {
-  if (appStore.activeModuleId) {
-    onCloseTab(appStore.activeModuleId)
+  if (appStore.activeTabId) {
+    onCloseTab(appStore.activeTabId)
   }
+}
+
+function duplicateActiveTab() {
+  if (appStore.activeTabId) {
+    onDuplicateTab(appStore.activeTabId)
+  }
+}
+
+function cycleTab(delta: number) {
+  const tabs = appStore.openTabs
+  if (tabs.length < 2) return
+
+  const index = tabs.findIndex(tab => tab.id === appStore.activeTabId)
+  if (index === -1) return
+
+  const next = tabs[(index + delta + tabs.length) % tabs.length]
+  onActivateTab(next.id)
 }
 
 const { register: registerShortcut } = useShortcuts({ onModuleSwitch: onOpenModule })
 registerShortcut('Ctrl+w', closeActiveTab)
+registerShortcut('Ctrl+Shift+D', duplicateActiveTab)
+registerShortcut('Ctrl+Tab', () => cycleTab(1))
+registerShortcut('Ctrl+Shift+Tab', () => cycleTab(-1))
+registerShortcut('Ctrl+PageDown', () => cycleTab(1))
+registerShortcut('Ctrl+PageUp', () => cycleTab(-1))
+
+watch(
+  () => router.currentRoute.value.meta.moduleId,
+  (moduleId) => {
+    if (!tabsReady) return
+    if (typeof moduleId !== 'string') return
+
+    const active = appStore.openTabs.find(tab => tab.id === appStore.activeTabId)
+    if (active?.moduleId === moduleId) {
+      switchModule(moduleId)
+      return
+    }
+
+    const existing = appStore.openTabs.find(tab => tab.moduleId === moduleId)
+    if (existing) {
+      if (existing.id !== appStore.activeTabId) {
+        appStore.activateTab(existing.id)
+        switchModule(moduleId)
+      }
+      return
+    }
+
+    onOpenModule(moduleId)
+  }
+)
+
+let tabsReady = false
 
 onMounted(async () => {
-  registerModuleRoutes()
   await appStore.restoreTabs()
-  const target = appStore.openTabs.includes(appStore.activeModuleId) && appStore.activeModuleId
-    ? appStore.activeModuleId
-    : appStore.openTabs[0] ?? allModules.value[0]?.id
-  if (target) {
-    onOpenModule(target)
+  appStore.pruneTabs(allModules.value.map(mod => mod.id))
+  tabsReady = true
+
+  const routeModuleId = router.currentRoute.value.meta.moduleId
+  if (typeof routeModuleId === 'string' && moduleOf(routeModuleId)) {
+    const existing = appStore.openTabs.find(tab => tab.moduleId === routeModuleId)
+    if (existing) onActivateTab(existing.id)
+    else onOpenModule(routeModuleId)
+    return
   }
+
+  const restored = appStore.openTabs.find(tab => tab.id === appStore.activeTabId)
+    ?? appStore.openTabs[0]
+  if (restored) {
+    onActivateTab(restored.id)
+    return
+  }
+
+  const firstModule = allModules.value[0]
+  if (firstModule) onOpenModule(firstModule.id)
 })
 </script>
 

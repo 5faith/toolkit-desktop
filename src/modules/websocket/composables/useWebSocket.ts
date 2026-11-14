@@ -1,12 +1,19 @@
-import { ref } from 'vue'
+import { onBeforeUnmount, ref } from 'vue'
+import { useCurrentTabId } from '@shared/composables/useCurrentTab'
 import { useWebsocketStore, type WsMessage } from '../store'
 
-let ws: WebSocket | null = null
+/** 每个 Tab 独立维护一条连接 */
+const sockets = new Map<string, WebSocket>()
 let msgCounter = 0
 
 export function useWebSocket() {
-  const store = useWebsocketStore()
+  const tabId = useCurrentTabId()
+  const store = useWebsocketStore(tabId)
   const error = ref('')
+
+  function currentSocket(): WebSocket | null {
+    return sockets.get(tabId) ?? null
+  }
 
   function addMessage(type: WsMessage['type'], content: string) {
     store.addMessage({
@@ -18,10 +25,11 @@ export function useWebSocket() {
   }
 
   function connect() {
-    if (ws) disconnect()
+    disconnect()
 
     try {
-      ws = new WebSocket(store.url)
+      const ws = new WebSocket(store.url)
+      sockets.set(tabId, ws)
 
       ws.onopen = () => {
         store.setConnected(true)
@@ -41,7 +49,7 @@ export function useWebSocket() {
       ws.onclose = (event) => {
         store.setConnected(false)
         addMessage('system', `Disconnected (code: ${event.code})`)
-        ws = null
+        if (sockets.get(tabId) === ws) sockets.delete(tabId)
       }
     } catch (e) {
       error.value = String(e)
@@ -49,13 +57,16 @@ export function useWebSocket() {
   }
 
   function disconnect() {
-    if (ws) {
-      ws.close()
-      ws = null
-    }
+    const ws = currentSocket()
+    if (!ws) return
+
+    sockets.delete(tabId)
+    store.setConnected(false)
+    ws.close()
   }
 
   function send(message: string) {
+    const ws = currentSocket()
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(message)
       addMessage('sent', message)
@@ -63,6 +74,8 @@ export function useWebSocket() {
       error.value = 'Not connected'
     }
   }
+
+  onBeforeUnmount(disconnect)
 
   return {
     error,

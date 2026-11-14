@@ -29,7 +29,13 @@ export function useFileDrop(options: UseFileDropOptions) {
     return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
   }
 
+  function isFileDrag(event: DragEvent): boolean {
+    const types = event.dataTransfer?.types
+    return !!types && Array.from(types).includes('Files')
+  }
+
   function handleHtmlDragOver(event: DragEvent) {
+    if (!isFileDrag(event)) return
     event.preventDefault()
     dragging.value = true
   }

@@ -2,70 +2,79 @@
   <div class="formatter-view">
     <FormatterToolbar
       :mode="store.mode"
-      :copied="copied"
+      :indent-size="store.indentSize"
       :compress-copied="compressCopied"
       @update:mode="store.setMode"
+      @update:indent-size="store.setIndentSize"
       @format="formatter.format()"
       @unescape="formatter.unescape()"
       @compress-copy="handleCompressCopy"
-      @copy="copyOutput"
     />
-
-    <div class="formatter-view__panels">
-      <section class="formatter-card">
-        <div class="formatter-card__head">
-          <span class="formatter-card__dot formatter-card__dot--in" />
-          <span class="formatter-card__title">Input</span>
-          <span
-            v-if="inputValidation"
-            class="formatter-card__badge"
-            :class="inputValidation.valid ? 'formatter-card__badge--ok' : 'formatter-card__badge--err'"
-            :title="inputValidation.error ?? ''"
-          >
-            {{ inputValidation.valid ? `Valid ${store.mode.toUpperCase()}` : 'Invalid' }}
-          </span>
-          <div class="formatter-card__spacer" />
-          <div class="formatter-card__actions">
-            <button
-              class="formatter-card__icon-btn"
-              title="Paste from clipboard"
-              @click="pasteInput"
-            >📋</button>
-            <button
-              class="formatter-card__icon-btn"
-              title="Clear input"
-              :disabled="!store.inputText"
-              @click="store.setInput('')"
-            >✕</button>
-          </div>
-        </div>
-        <div class="formatter-card__body">
-          <CodeEditor v-model="store.inputText" placeholder="Paste your code here..." show-line-numbers />
-        </div>
-      </section>
-
-      <div class="formatter-view__swap">
-        <button class="formatter-view__swap-btn" title="Swap input/output" @click="store.swap()">⇄</button>
-      </div>
-
-      <FormatterOutputPane />
-    </div>
 
     <div v-if="store.error" class="formatter-view__error">
       {{ store.error }}
     </div>
 
-    <div class="formatter-view__stats">
-      <span>In: {{ inputStats }}</span>
-      <span>Out: {{ outputStats }}</span>
-      <span v-if="store.durationMs !== null">Formatted in {{ store.durationMs }}ms</span>
-    </div>
+    <SplitPane
+      :model-value="store.splitRatio"
+      direction="horizontal"
+      :min="25"
+      :max="75"
+      :min-size="240"
+      :default-ratio="50"
+      class="formatter-view__panels"
+      @update:model-value="store.setSplitRatio"
+    >
+      <template #first>
+        <section class="formatter-card">
+          <div class="formatter-card__head">
+            <span class="formatter-card__dot formatter-card__dot--in" />
+            <span class="formatter-card__title">Input</span>
+            <span
+              v-if="inputValidation"
+              class="formatter-card__badge"
+              :class="inputValidation.valid ? 'formatter-card__badge--ok' : 'formatter-card__badge--err'"
+              :title="inputValidation.error ?? ''"
+            >
+              {{ inputValidation.valid ? `Valid ${store.mode.toUpperCase()}` : 'Invalid' }}
+            </span>
+            <div class="formatter-card__spacer" />
+            <span class="formatter-card__stats">{{ inputStats }}</span>
+            <div class="formatter-card__actions">
+              <button
+                class="formatter-card__icon-btn"
+                title="Paste from clipboard"
+                @click="pasteInput"
+              >📋</button>
+              <button
+                class="formatter-card__icon-btn"
+                title="Clear input"
+                :disabled="!store.inputText"
+                @click="store.setInput('')"
+              >✕</button>
+            </div>
+          </div>
+          <div class="formatter-card__body">
+            <CodeEditor v-model="store.inputText" placeholder="Paste your code here..." show-line-numbers />
+          </div>
+        </section>
+      </template>
+
+      <template #handle>
+        <button class="formatter-view__swap-btn" title="Swap input/output" @click="store.swap()">⇄</button>
+      </template>
+
+      <template #second>
+        <FormatterOutputPane />
+      </template>
+    </SplitPane>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import CodeEditor from '@shared/components/CodeEditor.vue'
+import SplitPane from '@shared/components/SplitPane.vue'
 import FormatterToolbar from './FormatterToolbar.vue'
 import FormatterOutputPane from './FormatterOutputPane.vue'
 import { useFormatterStore } from '../store'
@@ -82,8 +91,6 @@ const notification = useNotification()
 
 const compressCopied = ref(false)
 let compressCopyTimer: ReturnType<typeof setTimeout> | null = null
-const copied = ref(false)
-let copyTimer: ReturnType<typeof setTimeout> | null = null
 
 const { validateJsonSyntax, validateXmlSyntax, validateYamlSyntax } = useValidation()
 
@@ -100,7 +107,6 @@ function textStats(text: string): string {
 }
 
 const inputStats = computed(() => textStats(store.inputText))
-const outputStats = computed(() => textStats(store.outputText))
 
 async function handleCompressCopy() {
   const result = await formatter.compressCopy()
@@ -111,19 +117,6 @@ async function handleCompressCopy() {
       if (compressCopyTimer) clearTimeout(compressCopyTimer)
       compressCopyTimer = setTimeout(() => {
         compressCopied.value = false
-      }, 2000)
-    }
-  }
-}
-
-async function copyOutput() {
-  if (store.outputText) {
-    const success = await copyToClipboard(store.outputText)
-    if (success) {
-      copied.value = true
-      if (copyTimer) clearTimeout(copyTimer)
-      copyTimer = setTimeout(() => {
-        copied.value = false
       }, 2000)
     }
   }
@@ -151,19 +144,8 @@ async function pasteInput() {
 }
 
 .formatter-view__panels {
-  position: relative;
-  display: flex;
-  gap: var(--spacing-sm);
   flex: 1;
   min-height: 0;
-}
-
-.formatter-view__swap {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 5;
 }
 
 .formatter-view__swap-btn {
@@ -195,15 +177,6 @@ async function pasteInput() {
   background: color-mix(in srgb, var(--color-error) 10%, transparent);
   color: var(--color-error);
   font-size: 12.5px;
-  flex-shrink: 0;
-}
-
-.formatter-view__stats {
-  display: flex;
-  gap: var(--spacing-md);
-  padding: 0 var(--spacing-xs);
-  font-size: 11px;
-  color: var(--color-text-tertiary);
   flex-shrink: 0;
 }
 </style>

@@ -7,6 +7,7 @@ const shortcutsModule: ToolModule = {
   name: meta.name,
   icon: meta.icon,
   shortcut: meta.shortcut,
+  duplicatable: false,
   route: {
     path: '/shortcuts',
     name: 'shortcuts',

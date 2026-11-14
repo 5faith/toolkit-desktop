@@ -1,45 +1,58 @@
-import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { consumeTabSeed, useTabStore } from '@shared/composables/useTabStore'
+import { useCurrentTabId } from '@shared/composables/useCurrentTab'
 
 export type EncryptMode = 'uuid' | 'md5' | 'aes'
 
-export const useEncryptStore = defineStore('encrypt', () => {
-  const mode = ref<EncryptMode>('uuid')
-  const input = ref('')
-  const output = ref('')
-  const aesKey = ref('')
-  const aesIv = ref('')
+export interface EncryptSeed {
+  mode?: EncryptMode
+  input?: string
+  output?: string
+  aesKey?: string
+  aesIv?: string
+}
 
-  function setMode(m: EncryptMode) {
-    mode.value = m
-  }
+export function useEncryptStore(tabId = useCurrentTabId()) {
+  return useTabStore('encrypt', tabId, () => {
+    const seed = consumeTabSeed<EncryptSeed>('encrypt', tabId)
 
-  function setInput(text: string) {
-    input.value = text
-  }
+    const mode = ref<EncryptMode>(seed?.mode ?? 'uuid')
+    const input = ref(seed?.input ?? '')
+    const output = ref(seed?.output ?? '')
+    const aesKey = ref(seed?.aesKey ?? '')
+    const aesIv = ref(seed?.aesIv ?? '')
 
-  function setOutput(text: string) {
-    output.value = text
-  }
+    function setMode(m: EncryptMode) {
+      mode.value = m
+    }
 
-  function setAesKey(key: string) {
-    aesKey.value = key
-  }
+    function setInput(text: string) {
+      input.value = text
+    }
 
-  function setAesIv(iv: string) {
-    aesIv.value = iv
-  }
+    function setOutput(text: string) {
+      output.value = text
+    }
 
-  return {
-    mode,
-    input,
-    output,
-    aesKey,
-    aesIv,
-    setMode,
-    setInput,
-    setOutput,
-    setAesKey,
-    setAesIv,
-  }
-})
+    function setAesKey(key: string) {
+      aesKey.value = key
+    }
+
+    function setAesIv(iv: string) {
+      aesIv.value = iv
+    }
+
+    return {
+      mode,
+      input,
+      output,
+      aesKey,
+      aesIv,
+      setMode,
+      setInput,
+      setOutput,
+      setAesKey,
+      setAesIv,
+    }
+  })
+}

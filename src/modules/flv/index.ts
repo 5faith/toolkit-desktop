@@ -8,6 +8,7 @@ const liveModule: ToolModule = {
   icon: meta.icon,
   shortcut: meta.shortcut,
   keepAlive: false,
+  duplicatable: false,
   card: false,
   route: {
     path: '/live',

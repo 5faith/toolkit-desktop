@@ -1,6 +1,6 @@
 import { createApp } from 'vue'
 import { pinia } from './stores'
-import router from './router'
+import router, { registerModuleRoutes } from './router'
 import App from './App.vue'
 import { registerAllModules } from './modules'
 
@@ -47,6 +47,7 @@ window.addEventListener('paste', (e) => {
 }, true)
 
 registerAllModules()
+registerModuleRoutes()
 
 const app = createApp(App)
 app.use(pinia)

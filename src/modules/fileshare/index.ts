@@ -7,6 +7,7 @@ const fileshareModule: ToolModule = {
   name: meta.name,
   icon: meta.icon,
   shortcut: meta.shortcut,
+  duplicatable: false,
   route: {
     path: '/fileshare',
     name: 'fileshare',

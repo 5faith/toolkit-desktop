@@ -1,175 +1,117 @@
 <template>
   <div class="diff-view">
     <div class="diff-view__toolbar">
-      <button class="action-btn" @click="computeDiff">Compare</button>
-      <div class="diff-view__view-modes">
-        <button
-          class="mode-btn"
-          :class="{ 'mode-btn--active': store.viewMode === 'side-by-side' }"
-          @click="store.setViewMode('side-by-side')"
-        >
-          Side by Side
-        </button>
-        <button
-          class="mode-btn"
-          :class="{ 'mode-btn--active': store.viewMode === 'unified' }"
-          @click="store.setViewMode('unified')"
-        >
-          Unified
-        </button>
-      </div>
+      <button class="action-btn action-btn--primary" @click="computeDiff">Compare</button>
+      <button class="action-btn" @click="toggleInputs">
+        {{ store.inputCollapsed ? '展开输入 ▼' : '收起输入 ▲' }}
+      </button>
+      <span v-if="store.inputCollapsed" class="diff-view__summary">
+        原文 {{ leftLineCount }} 行 · 修改后 {{ rightLineCount }} 行
+      </span>
     </div>
 
-    <div class="diff-view__inputs">
-      <div class="diff-view__input-panel">
-        <div class="panel-header">Left (Original)</div>
-        <CodeEditor v-model="store.leftText" placeholder="Paste original text..." />
-      </div>
-      <div class="diff-view__input-panel">
-        <div class="panel-header">Right (Modified)</div>
-        <CodeEditor v-model="store.rightText" placeholder="Paste modified text..." />
-      </div>
-    </div>
-
-    <div v-if="alignedLines.length > 0" class="diff-view__result">
-      <div class="panel-header">Diff Result</div>
-
-      <div v-if="store.viewMode === 'side-by-side'" class="diff-side">
-        <div class="diff-side__panel">
-          <div
-            ref="leftScrollRef"
-            class="diff-side__scroll"
-            @scroll="syncScroll('left')"
-          >
-            <div
-              v-for="(line, i) in leftLines"
-              :key="'l' + i"
-              class="diff-line"
-              :class="{
-                'diff-line--removed': line.type === 'removed',
-                'diff-line--padding': line.type === 'padding',
-              }"
-            >
-              <pre class="diff-line__text">{{ line.text }}</pre>
+    <SplitPane
+      v-if="!store.inputCollapsed"
+      :model-value="store.splitRatio"
+      direction="vertical"
+      :min="12"
+      :max="55"
+      :default-ratio="28"
+      class="diff-view__split"
+      @update:model-value="store.setSplitRatio"
+    >
+      <template #first>
+        <div class="diff-view__inputs">
+          <div class="diff-view__input-panel">
+            <div class="panel-header">
+              <span>Left (Original)</span>
+              <span class="panel-header__meta">{{ leftLineCount }} lines</span>
+              <div class="panel-header__spacer" />
+              <div class="panel-header__actions">
+                <button class="icon-btn" title="Paste from clipboard" @click="pasteInto('left')">📋</button>
+                <button
+                  class="icon-btn"
+                  title="Clear"
+                  :disabled="!store.leftText"
+                  @click="store.setLeft('')"
+                >✕</button>
+              </div>
             </div>
+            <CodeEditor v-model="store.leftText" placeholder="Paste original text..." />
+          </div>
+
+          <div class="diff-view__input-panel">
+            <div class="panel-header">
+              <span>Right (Modified)</span>
+              <span class="panel-header__meta">{{ rightLineCount }} lines</span>
+              <div class="panel-header__spacer" />
+              <div class="panel-header__actions">
+                <button class="icon-btn" title="Paste from clipboard" @click="pasteInto('right')">📋</button>
+                <button
+                  class="icon-btn"
+                  title="Clear"
+                  :disabled="!store.rightText"
+                  @click="store.setRight('')"
+                >✕</button>
+              </div>
+            </div>
+            <CodeEditor v-model="store.rightText" placeholder="Paste modified text..." />
           </div>
         </div>
-        <div class="diff-side__panel">
-          <div
-            ref="rightScrollRef"
-            class="diff-side__scroll"
-            @scroll="syncScroll('right')"
-          >
-            <div
-              v-for="(line, i) in rightLines"
-              :key="'r' + i"
-              class="diff-line"
-              :class="{
-                'diff-line--added': line.type === 'added',
-                'diff-line--padding': line.type === 'padding',
-              }"
-            >
-              <pre class="diff-line__text">{{ line.text }}</pre>
-            </div>
-          </div>
-        </div>
-      </div>
+      </template>
 
-      <div v-else class="diff-unified">
-        <div
-          v-for="(change, index) in lineDiff"
-          :key="index"
-          class="diff-line"
-          :class="{
-            'diff-line--added': change.added,
-            'diff-line--removed': change.removed,
-          }"
-        >
-          <span class="diff-line__marker">{{ change.added ? '+' : change.removed ? '-' : ' ' }}</span>
-          <pre class="diff-line__text">{{ change.value }}</pre>
-        </div>
-      </div>
-    </div>
+      <template #second>
+        <DiffResultPane :changes="lineDiff" class="diff-view__result" />
+      </template>
+    </SplitPane>
+
+    <DiffResultPane
+      v-else
+      :changes="lineDiff"
+      class="diff-view__result diff-view__result--full"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-
-defineOptions({ name: 'DiffView' })
 import { computed, ref } from 'vue'
 import type { Change } from 'diff'
 import CodeEditor from '@shared/components/CodeEditor.vue'
+import SplitPane from '@shared/components/SplitPane.vue'
+import { useNotification } from '@shared/composables/useNotification'
 import { useDiffStore } from '../store'
 import { useDiff } from '../composables/useDiff'
+import DiffResultPane from './DiffResultPane.vue'
+
+defineOptions({ name: 'DiffView' })
 
 const store = useDiffStore()
 const { computeDiff: doCompute, computeLineDiff } = useDiff()
+const notification = useNotification()
 
 const lineDiff = ref<Change[]>([])
 
-interface DiffLine {
-  text: string
-  type: 'added' | 'removed' | 'unchanged' | 'padding'
-}
-
-interface AlignedPair {
-  left: DiffLine
-  right: DiffLine
-}
-
-const alignedLines = computed<AlignedPair[]>(() => {
-  const pairs: AlignedPair[] = []
-  for (const change of lineDiff.value) {
-    const lines = change.value.split('\n')
-    if (change.removed) {
-      for (const line of lines) {
-        pairs.push({
-          left: { text: line, type: 'removed' },
-          right: { text: '', type: 'padding' },
-        })
-      }
-    } else if (change.added) {
-      for (const line of lines) {
-        pairs.push({
-          left: { text: '', type: 'padding' },
-          right: { text: line, type: 'added' },
-        })
-      }
-    } else {
-      for (const line of lines) {
-        pairs.push({
-          left: { text: line, type: 'unchanged' },
-          right: { text: line, type: 'unchanged' },
-        })
-      }
-    }
-  }
-  return pairs
-})
-
-const leftLines = computed<DiffLine[]>(() => alignedLines.value.map((p) => p.left))
-const rightLines = computed<DiffLine[]>(() => alignedLines.value.map((p) => p.right))
+const leftLineCount = computed(() => (store.leftText ? store.leftText.split('\n').length : 0))
+const rightLineCount = computed(() => (store.rightText ? store.rightText.split('\n').length : 0))
 
 function computeDiff() {
   doCompute()
   lineDiff.value = computeLineDiff()
 }
 
-const leftScrollRef = ref<HTMLDivElement>()
-const rightScrollRef = ref<HTMLDivElement>()
-let syncing = false
+function toggleInputs() {
+  store.setInputCollapsed(!store.inputCollapsed)
+}
 
-function syncScroll(source: 'left' | 'right') {
-  if (syncing) return
-  syncing = true
-  requestAnimationFrame(() => {
-    const sourceEl = source === 'left' ? leftScrollRef.value : rightScrollRef.value
-    const targetEl = source === 'left' ? rightScrollRef.value : leftScrollRef.value
-    if (sourceEl && targetEl) {
-      targetEl.scrollTop = sourceEl.scrollTop
-    }
-    syncing = false
-  })
+async function pasteInto(side: 'left' | 'right') {
+  try {
+    const text = await navigator.clipboard.readText()
+    if (!text) return
+    if (side === 'left') store.setLeft(text)
+    else store.setRight(text)
+  } catch {
+    notification.error('Unable to read clipboard')
+  }
 }
 </script>
 
@@ -178,40 +120,113 @@ function syncScroll(source: 'left' | 'right') {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
   background: var(--color-bg-secondary);
 }
 
 .diff-view__toolbar {
   display: flex;
   align-items: center;
-  gap: var(--spacing-md);
+  gap: var(--spacing-sm);
   padding: var(--spacing-sm) var(--spacing-md);
   background: var(--color-bg-primary);
   border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
 }
 
-.diff-view__view-modes {
+.diff-view__summary {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+}
+
+.diff-view__split {
+  flex: 1;
+  min-height: 0;
+}
+
+.diff-view__inputs {
   display: flex;
-  gap: var(--spacing-xs);
+  flex: 1;
+  gap: 1px;
+  background: var(--color-border);
+  min-height: 0;
 }
 
-.mode-btn {
-  padding: var(--spacing-xs) var(--spacing-md);
-  border-radius: var(--radius-md);
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--color-text-secondary);
-  transition: all 0.15s;
+.diff-view__input-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--color-bg-primary);
+  overflow: hidden;
 }
 
-.mode-btn:hover {
+.diff-view__result {
+  flex: 1;
+  min-height: 0;
+}
+
+.diff-view__result--full {
+  border-top: none;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: 0 var(--spacing-md);
+  min-height: 34px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.panel-header__meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.panel-header__spacer {
+  flex: 1;
+}
+
+.panel-header__actions {
+  display: flex;
+  gap: 2px;
+}
+
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.icon-btn:hover:not(:disabled) {
   background: var(--color-bg-hover);
+  color: var(--color-text-primary);
 }
 
-.mode-btn--active {
-  background: var(--color-accent-light);
-  color: var(--color-accent);
+.icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .action-btn {
@@ -228,113 +243,15 @@ function syncScroll(source: 'left' | 'right') {
   border-color: var(--color-border-hover);
 }
 
-.diff-view__inputs {
-  display: flex;
-  flex: 0 0 30%;
-  gap: 1px;
-  background: var(--color-border);
-  min-height: 80px;
+.action-btn--primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+  font-weight: 500;
 }
 
-.diff-view__input-panel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  background: var(--color-bg-primary);
-  overflow: hidden;
-}
-
-.panel-header {
-  padding: var(--spacing-xs) var(--spacing-md);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border-bottom: 1px solid var(--color-border);
-  flex-shrink: 0;
-}
-
-.diff-view__result {
-  flex: 1;
-  background: var(--color-bg-primary);
-  border-top: 1px solid var(--color-border);
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.diff-side {
-  flex: 1;
-  display: flex;
-  gap: 1px;
-  background: var(--color-border);
-  min-height: 0;
-}
-
-.diff-side__panel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  background: var(--color-bg-primary);
-  min-height: 0;
-}
-
-.diff-side__scroll {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0;
-}
-
-.diff-unified {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0;
-}
-
-.diff-line {
-  display: flex;
-  padding: 0 var(--spacing-sm);
-  font-family: var(--font-mono);
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.diff-line--added {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.diff-line--removed {
-  background: #fee2e2;
-  color: #991b1b;
-}
-
-.diff-line--padding {
-  background: var(--color-bg-secondary);
-  min-height: 1.5em;
-}
-
-[data-theme="dark"] .diff-line--added {
-  background: #14532d;
-  color: #86efac;
-}
-
-[data-theme="dark"] .diff-line--removed {
-  background: #7f1d1d;
-  color: #fca5a5;
-}
-
-.diff-line__marker {
-  width: 20px;
-  text-align: center;
-  flex-shrink: 0;
-  user-select: none;
-}
-
-.diff-line__text {
-  white-space: pre-wrap;
-  word-break: break-all;
-  margin: 0;
+.action-btn--primary:hover {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
 }
 </style>

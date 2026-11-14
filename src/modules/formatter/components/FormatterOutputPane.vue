@@ -6,6 +6,10 @@
       <span v-if="store.outputText" class="formatter-card__badge formatter-card__badge--ok">
         {{ outputLineCount }} lines
       </span>
+      <span v-if="store.outputText" class="formatter-card__stats">{{ outputCharCount }} chars</span>
+      <span v-if="store.outputText && store.durationMs !== null" class="formatter-card__stats">
+        {{ store.durationMs }}ms
+      </span>
       <div class="formatter-card__spacer" />
       <div v-if="store.outputText" class="search-box">
         <input
@@ -21,23 +25,17 @@
       </div>
       <div class="formatter-card__actions">
         <button
-          class="formatter-card__icon-btn"
+          class="formatter-card__icon-btn formatter-card__icon-btn--lg"
           :class="{ 'formatter-card__icon-btn--on': wrapOutput }"
           title="Toggle line wrap"
           @click="wrapOutput = !wrapOutput"
         >⏎</button>
         <button
-          class="formatter-card__icon-btn"
+          class="formatter-card__icon-btn formatter-card__icon-btn--lg"
           title="Copy output"
           :disabled="!store.outputText"
           @click="copyOutput"
         >⧉</button>
-        <button
-          class="formatter-card__icon-btn"
-          title="Download output"
-          :disabled="!store.outputText"
-          @click="downloadOutput"
-        >⬇</button>
       </div>
     </div>
     <div class="formatter-card__body">
@@ -114,23 +112,12 @@ const jsonParsed = computed(() => {
 })
 
 const outputLineCount = computed(() => store.outputText.split('\n').length)
+const outputCharCount = computed(() => store.outputText.length)
 
 async function copyOutput() {
   if (store.outputText) {
     await copyToClipboard(store.outputText)
   }
-}
-
-function downloadOutput() {
-  if (!store.outputText) return
-  const ext = store.mode
-  const blob = new Blob([store.outputText], { type: 'text/plain;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = `output.${ext}`
-  anchor.click()
-  URL.revokeObjectURL(url)
 }
 
 function onSearchEnter() {

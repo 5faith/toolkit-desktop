@@ -116,6 +116,27 @@ pub async fn stop_file_share() -> Result<(), String> {
     Ok(())
 }
 
+/// 尝试关闭端口上的残留分享服务。
+/// 通过 Rust 侧发请求，避免前端 fetch 连接失败时在控制台产生 ERR_CONNECTION_REFUSED。
+#[tauri::command]
+pub async fn shutdown_residual_file_share(port: u16) -> Result<bool, String> {
+    use tokio::io::AsyncWriteExt;
+
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    let mut stream = match tokio::net::TcpStream::connect(addr).await {
+        Ok(stream) => stream,
+        Err(_) => return Ok(false),
+    };
+
+    let request = "GET /__shutdown HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
+    stream
+        .write_all(request.as_bytes())
+        .await
+        .map_err(|e| e.to_string())?;
+    let _ = stream.shutdown().await;
+    Ok(true)
+}
+
 #[derive(Serialize, Clone)]
 pub struct NetworkInterface {
     pub name: String,
@@ -257,6 +278,9 @@ pub fn register_shared_file(file_path: String) -> Result<FileInfo, String> {
     let path = PathBuf::from(&file_path);
     if !path.exists() {
         return Err(format!("File not found: {}", file_path));
+    }
+    if !path.is_file() {
+        return Err("不支持文件夹，请拖入文件".to_string());
     }
     let name = path
         .file_name()

@@ -1,5 +1,6 @@
-import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { consumeTabSeed, useTabStore } from '@shared/composables/useTabStore'
+import { useCurrentTabId } from '@shared/composables/useCurrentTab'
 
 export interface WsMessage {
   id: string
@@ -8,41 +9,49 @@ export interface WsMessage {
   timestamp: number
 }
 
-export const useWebsocketStore = defineStore('websocket', () => {
-  const url = ref('ws://localhost:8080')
-  const connected = ref(false)
-  const messages = ref<WsMessage[]>([])
-  const autoBottom = ref(true)
+export interface WebsocketSeed {
+  url?: string
+}
 
-  function setUrl(u: string) {
-    url.value = u
-  }
+export function useWebsocketStore(tabId = useCurrentTabId()) {
+  return useTabStore('websocket', tabId, () => {
+    const seed = consumeTabSeed<WebsocketSeed>('websocket', tabId)
 
-  function setConnected(c: boolean) {
-    connected.value = c
-  }
+    const url = ref(seed?.url ?? 'ws://localhost:8080')
+    const connected = ref(false)
+    const messages = ref<WsMessage[]>([])
+    const autoBottom = ref(true)
 
-  function addMessage(msg: WsMessage) {
-    messages.value.push(msg)
-  }
+    function setUrl(u: string) {
+      url.value = u
+    }
 
-  function clearMessages() {
-    messages.value = []
-  }
+    function setConnected(c: boolean) {
+      connected.value = c
+    }
 
-  function setAutoBottom(v: boolean) {
-    autoBottom.value = v
-  }
+    function addMessage(msg: WsMessage) {
+      messages.value.push(msg)
+    }
 
-  return {
-    url,
-    connected,
-    messages,
-    autoBottom,
-    setUrl,
-    setConnected,
-    addMessage,
-    clearMessages,
-    setAutoBottom,
-  }
-})
+    function clearMessages() {
+      messages.value = []
+    }
+
+    function setAutoBottom(v: boolean) {
+      autoBottom.value = v
+    }
+
+    return {
+      url,
+      connected,
+      messages,
+      autoBottom,
+      setUrl,
+      setConnected,
+      addMessage,
+      clearMessages,
+      setAutoBottom,
+    }
+  })
+}
